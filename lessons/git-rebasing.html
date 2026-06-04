@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How Git Rebasing Works — Learning</title>
+<meta name="description" content="A first-principles, visual guide to Git rebase: the replay model, merge vs rebase, interactive rebase, the golden rule, and how to recover when things go wrong." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb;
+    --surface: #ffffff;
+    --text: #1f2433;
+    --muted: #5b6478;
+    --faint: #8a93a6;
+    --border: #e7e9f0;
+    --primary: #5b51e8;
+    --primary-dark: #4338ca;
+    --primary-soft: #eef0ff;
+    --main-branch: #2f7df6;
+    --feature-branch: #f59e0b;
+    --rebased: #10b981;
+    --merge: #8b5cf6;
+    --danger: #ef4444;
+    --danger-soft: #fef2f2;
+    --tip-soft: #ecfdf5;
+    --note-soft: #eff6ff;
+    --warn-soft: #fffbeb;
+    --code-bg: #0f1629;
+    --code-text: #e6e9f2;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%),
+      var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ---------- progress + top bar ---------- */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--primary), var(--merge));
+    z-index: 100; transition: width .1s linear;
+  }
+  .topbar {
+    position: sticky; top: 0; z-index: 60;
+    backdrop-filter: saturate(180%) blur(10px);
+    background: rgba(247,247,251,.82);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 1080px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .home-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px;
+    padding: 6px 12px; border-radius: 999px; transition: all .15s ease;
+  }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  /* ---------- layout ---------- */
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 760px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  /* ---------- hero ---------- */
+  .hero { text-align: center; padding: 64px 24px 24px; max-width: 820px; margin: 0 auto; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--primary-soft); color: var(--primary-dark);
+    font-weight: 600; font-size: 13px; letter-spacing: .02em;
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 22px;
+    border: 1px solid #ddd9ff;
+  }
+  .hero h1 {
+    font-size: clamp(2.1rem, 5vw, 3.3rem); line-height: 1.08;
+    font-weight: 800; letter-spacing: -0.025em; margin: 0 0 18px;
+    background: linear-gradient(120deg, #1f2433 30%, #5b51e8 75%, #8b5cf6);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p.lede { font-size: 1.2rem; color: var(--muted); margin: 0 auto; max-width: 600px; }
+  .meta-row {
+    display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
+    margin-top: 26px; color: var(--faint); font-size: 13.5px; font-weight: 500;
+  }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  /* ---------- TOC ---------- */
+  .toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px 26px; margin: 32px auto 8px;
+    max-width: 760px; box-shadow: var(--shadow);
+  }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 15px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  /* ---------- typography ---------- */
+  h2.sec {
+    font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em;
+    margin: 60px 0 6px; line-height: 1.2; scroll-margin-top: 84px;
+  }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; margin-right: 10px; vertical-align: middle; }
+  h3 { font-size: 1.22rem; font-weight: 700; margin: 34px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 14px 0; color: #2b3142; }
+  main p { font-size: 1.06rem; }
+  strong { color: var(--text); font-weight: 700; }
+  em { color: #3a4255; }
+  a.inline { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1.5px; }
+  .lead-in { font-size: 1.16rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 18px; margin: 18px 0 26px; }
+  code {
+    font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: .9em; background: #eef0f6; color: #3b3f72;
+    padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500;
+  }
+
+  /* ---------- code blocks ---------- */
+  .code-block { position: relative; margin: 20px 0; }
+  .code-block pre {
+    background: var(--code-bg); color: var(--code-text);
+    border-radius: 12px; padding: 20px 22px; overflow-x: auto;
+    font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+    font-size: 14px; line-height: 1.65; margin: 0; box-shadow: var(--shadow);
+  }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .cmt { color: #7e89a8; }
+  .code-block .cmd { color: #7ee0b8; }
+  .code-block .flag { color: #f6c177; }
+  .code-block .str { color: #9fb4ff; }
+  .copy-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(255,255,255,.08); color: #cdd3e6; border: 1px solid rgba(255,255,255,.14);
+    border-radius: 7px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: 'Inter', sans-serif; transition: all .15s ease; opacity: 0;
+  }
+  .code-block:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+  .copy-btn.copied { background: var(--rebased); color: #fff; border-color: var(--rebased); }
+
+  /* ---------- callouts ---------- */
+  .callout {
+    display: flex; gap: 14px; padding: 16px 20px; border-radius: 14px;
+    margin: 24px 0; border: 1px solid var(--border); background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .callout .ic { font-size: 1.3rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: 1rem; }
+  .callout .body p { margin: 0; color: #2b3142; }
+  .callout .body p + p { margin-top: 8px; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; }
+  .callout.note .t { color: #1d4ed8; }
+  .callout.tip { background: var(--tip-soft); border-color: #c7f0dd; }
+  .callout.tip .t { color: #047857; }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; }
+  .callout.warn .t { color: #b45309; }
+  .callout.danger { background: var(--danger-soft); border-color: #fbd2d2; }
+  .callout.danger .t { color: #b91c1c; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; }
+  .callout.key .t { color: var(--primary-dark); }
+
+  /* ---------- figure / diagrams ---------- */
+  figure {
+    margin: 30px 0; padding: 26px 22px 18px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    text-align: center;
+  }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .92rem; color: var(--muted); margin-top: 14px; line-height: 1.55; }
+  figcaption b { color: var(--text); }
+  .legend { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+
+  /* svg text helpers */
+  .c-label { font: 600 16px 'JetBrains Mono', monospace; fill: #fff; }
+  .ref-text { font: 700 12.5px 'Inter', sans-serif; fill: #fff; }
+  .anno { font: 500 13px 'Inter', sans-serif; fill: #5b6478; }
+  .anno-b { font: 700 13px 'Inter', sans-serif; }
+
+  /* ---------- toggle (merge vs rebase) ---------- */
+  .switcher { margin: 30px 0; }
+  .switch-tabs { display: inline-flex; background: #ececf6; padding: 5px; border-radius: 12px; gap: 4px; }
+  .switch-tabs button {
+    border: none; background: transparent; cursor: pointer;
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 14.5px; color: var(--muted);
+    padding: 9px 20px; border-radius: 9px; transition: all .18s ease;
+  }
+  .switch-tabs button.active { background: #fff; color: var(--primary-dark); box-shadow: var(--shadow); }
+  .switch-panel { display: none; }
+  .switch-panel.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- interactive-rebase todo ---------- */
+  .rebase-todo {
+    background: var(--code-bg); border-radius: 12px; padding: 8px; margin: 22px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 13.5px; box-shadow: var(--shadow);
+  }
+  .todo-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 8px; }
+  .todo-row + .todo-row { margin-top: 2px; }
+  .todo-verb { font-weight: 600; padding: 2px 9px; border-radius: 6px; min-width: 64px; text-align: center; font-size: 12.5px; }
+  .v-pick { background: rgba(126,224,184,.16); color: #7ee0b8; }
+  .v-reword { background: rgba(246,193,119,.16); color: #f6c177; }
+  .v-squash { background: rgba(139,124,246,.2); color: #b3a6ff; }
+  .v-drop { background: rgba(239,68,68,.16); color: #ff9b9b; }
+  .todo-hash { color: #6b7699; }
+  .todo-msg { color: #d7dcec; }
+  .todo-note { margin-left: auto; color: #6b7699; font-family: 'Inter', sans-serif; font-size: 12px; font-style: italic; }
+
+  /* ---------- decision table ---------- */
+  .cmp { width: 100%; border-collapse: separate; border-spacing: 0; margin: 24px 0; font-size: 15px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  .cmp th, .cmp td { padding: 14px 18px; text-align: left; vertical-align: top; }
+  .cmp thead th { background: #f1f1f9; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .cmp tbody td { border-bottom: 1px solid var(--border); background: var(--surface); }
+  .cmp tbody tr:last-child td { border-bottom: none; }
+  .cmp td:first-child { font-weight: 600; color: var(--text); width: 34%; }
+  .cmp .yes { color: #047857; font-weight: 600; }
+  .cmp .no { color: #b91c1c; font-weight: 600; }
+
+  /* ---------- reference cards ---------- */
+  .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0; }
+  @media (max-width: 620px) { .ref-grid { grid-template-columns: 1fr; } }
+  .ref-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .ref-card h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--primary-dark); }
+  .ref-card code { display: block; background: var(--code-bg); color: var(--code-text); border: none; padding: 8px 12px; border-radius: 8px; margin: 6px 0; font-size: 13px; }
+  .ref-card .d { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+
+  /* ---------- takeaways ---------- */
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 32px 34px; margin: 50px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 16px; font-size: 1.5rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.04rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li .k { font-size: 1.15rem; }
+  .takeaways li b { color: #fff; }
+  .takeaways li span.tx { color: #ece9ff; }
+
+  /* ---------- footer ---------- */
+  footer { text-align: center; padding: 50px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Git Rebasing</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🌿 Version Control · Git</span>
+  <h1>How Git Rebasing Works</h1>
+  <p class="lede">Rewriting history sounds scary. It isn't — once you see that a commit is just a snapshot and a branch is just a sticky note. Let's build the whole idea from scratch.</p>
+  <div class="meta-row">
+    <span>⏱️ ~15 min read</span>
+    <span>🎯 Beginner-friendly</span>
+    <span>🧩 Built from first principles</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>What we'll cover</h2>
+  <ol>
+    <li><a href="#tldr">The 30-second version</a></li>
+    <li><a href="#foundations">Three ideas you need first</a></li>
+    <li><a href="#problem">The problem rebase solves</a></li>
+    <li><a href="#two-ways">Two ways to catch up</a></li>
+    <li><a href="#how">How rebase actually works</a></li>
+    <li><a href="#commands">The commands</a></li>
+    <li><a href="#interactive">Interactive rebase</a></li>
+    <li><a href="#golden">The golden rule</a></li>
+    <li><a href="#force">Force-pushing safely</a></li>
+    <li><a href="#rescue">When things go wrong</a></li>
+    <li><a href="#decision">Merge vs rebase: when?</a></li>
+    <li><a href="#reference">Quick reference</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- ============ TLDR ============ -->
+  <section id="tldr">
+    <h2 class="sec"><span class="num">01</span>The 30-second version</h2>
+    <p class="lead-in">Rebasing means giving your work a new starting point. You pick up the commits you made on your branch, set them aside, jump forward to the latest code, and re-apply your commits on top — one at a time — as if you'd started from there all along.</p>
+    <p>The result is a clean, straight line of history: no tangled merge commits, just your work sitting neatly on top of everyone else's. That's the entire idea. Everything below is just <em>why</em> it works and <em>how</em> to do it without hurting yourself.</p>
+  </section>
+
+  <!-- ============ FOUNDATIONS ============ -->
+  <section id="foundations">
+    <h2 class="sec"><span class="num">02</span>Three ideas you need first</h2>
+    <p>You cannot understand rebasing until three small ideas are crystal clear. Most confusion about Git evaporates the moment these click. Take a minute on each.</p>
+
+    <h3>① A commit is a snapshot with a parent</h3>
+    <p>A commit is a photograph of your <strong>entire project</strong> at one moment, plus a pointer to the commit that came right before it — its <strong>parent</strong>. Because every commit points back to its parent, commits form a chain stretching all the way to the very first one.</p>
+    <p>Here's the part that makes rebasing make sense: a commit's ID (that <code>a1b2c3</code> hash) is calculated from its <em>contents</em> <strong>and</strong> <em>its parent</em>. Change either one and you get a completely different commit with a different ID. Remember this — it's the secret of the whole article.</p>
+
+    <h3>② A branch is just a movable label</h3>
+    <p>This surprises everyone: a branch is <strong>not</strong> a box that holds commits. A branch is a tiny, movable sticky note that points at <em>one</em> commit — the latest on that line of work. Make a new commit, and the sticky note slides forward to it. That's all a branch is.</p>
+
+    <h3>③ HEAD is "you are here"</h3>
+    <p><strong>HEAD</strong> is a pointer to where you currently are — normally it points at a branch (and therefore at that branch's commit). It's how Git knows which sticky note to slide forward when you commit.</p>
+
+    <figure>
+      <svg viewBox="0 0 660 230" role="img" aria-label="A chain of commits with branch labels and HEAD">
+        <!-- edges -->
+        <line x1="80" y1="120" x2="200" y2="120" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="200" y1="120" x2="320" y2="120" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="320" y1="120" x2="440" y2="120" stroke="#cbd5e1" stroke-width="3"/>
+        <!-- parent direction arrow hint -->
+        <text x="140" y="148" class="anno" text-anchor="middle">⟵ parent</text>
+        <!-- commits -->
+        <circle cx="80"  cy="120" r="26" fill="#2f7df6"/>
+        <circle cx="200" cy="120" r="26" fill="#2f7df6"/>
+        <circle cx="320" cy="120" r="26" fill="#2f7df6"/>
+        <circle cx="440" cy="120" r="26" fill="#2f7df6"/>
+        <text x="80"  y="126" text-anchor="middle" class="c-label">A</text>
+        <text x="200" y="126" text-anchor="middle" class="c-label">B</text>
+        <text x="320" y="126" text-anchor="middle" class="c-label">C</text>
+        <text x="440" y="126" text-anchor="middle" class="c-label">D</text>
+        <!-- branch label main -->
+        <g>
+          <rect x="404" y="46" width="72" height="26" rx="7" fill="#2f7df6"/>
+          <text x="440" y="64" text-anchor="middle" class="ref-text">main</text>
+          <line x1="440" y1="72" x2="440" y2="94" stroke="#2f7df6" stroke-width="2.5"/>
+        </g>
+        <!-- HEAD -->
+        <g>
+          <rect x="396" y="166" width="88" height="26" rx="7" fill="#1f2433"/>
+          <text x="440" y="184" text-anchor="middle" class="ref-text">HEAD</text>
+          <line x1="440" y1="166" x2="440" y2="146" stroke="#1f2433" stroke-width="2.5"/>
+        </g>
+        <text x="560" y="126" class="anno" text-anchor="middle">newest →</text>
+      </svg>
+      <figcaption>Four commits chained by parent pointers. <b>main</b> is a label pointing at the newest commit <b>D</b>; <b>HEAD</b> points at <b>main</b>. Commit once more and both labels simply slide right to the new commit.</figcaption>
+    </figure>
+
+    <div class="callout key">
+      <span class="ic">🔑</span>
+      <div class="body"><span class="t">Hold onto this</span>
+        <p>A commit's identity depends on its parent. So if you ever give a commit a <em>new</em> parent, you don't move the old commit — you create a <strong>brand-new commit</strong> with the same changes but a different ID. That single fact <em>is</em> rebasing.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROBLEM ============ -->
+  <section id="problem">
+    <h2 class="sec"><span class="num">03</span>The problem rebase solves</h2>
+    <p>You branch off <code>main</code> to build a feature. You make a couple of commits. Meanwhile, your teammates merge their own work into <code>main</code>, so <code>main</code> moves ahead. Now your branch is hanging off an <em>old</em> commit — your work is "based on" yesterday's code.</p>
+    <p>You'd like your feature to sit on top of <em>today's</em> <code>main</code>: partly to pull in the latest changes, and partly so that when you merge back, the history is clean instead of tangled.</p>
+
+    <figure>
+      <svg viewBox="0 0 640 250" role="img" aria-label="A feature branch that has fallen behind main">
+        <!-- main edges -->
+        <line x1="70" y1="80" x2="190" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="190" y1="80" x2="310" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="310" y1="80" x2="430" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+        <!-- feature diverge from B -->
+        <line x1="190" y1="80" x2="310" y2="180" stroke="#f0c98a" stroke-width="3"/>
+        <line x1="310" y1="180" x2="430" y2="180" stroke="#f0c98a" stroke-width="3"/>
+        <!-- main commits -->
+        <circle cx="70"  cy="80" r="25" fill="#2f7df6"/>
+        <circle cx="190" cy="80" r="25" fill="#2f7df6"/>
+        <circle cx="310" cy="80" r="25" fill="#2f7df6"/>
+        <circle cx="430" cy="80" r="25" fill="#2f7df6"/>
+        <text x="70"  y="86" text-anchor="middle" class="c-label">A</text>
+        <text x="190" y="86" text-anchor="middle" class="c-label">B</text>
+        <text x="310" y="86" text-anchor="middle" class="c-label">C</text>
+        <text x="430" y="86" text-anchor="middle" class="c-label">D</text>
+        <!-- feature commits -->
+        <circle cx="310" cy="180" r="25" fill="#f59e0b"/>
+        <circle cx="430" cy="180" r="25" fill="#f59e0b"/>
+        <text x="310" y="186" text-anchor="middle" class="c-label">E</text>
+        <text x="430" y="186" text-anchor="middle" class="c-label">F</text>
+        <!-- labels -->
+        <g>
+          <rect x="394" y="30" width="72" height="26" rx="7" fill="#2f7df6"/>
+          <text x="430" y="48" text-anchor="middle" class="ref-text">main</text>
+          <line x1="430" y1="56" x2="430" y2="54" stroke="#2f7df6" stroke-width="2.5"/>
+        </g>
+        <g>
+          <rect x="386" y="208" width="88" height="26" rx="7" fill="#f59e0b"/>
+          <text x="430" y="226" text-anchor="middle" class="ref-text">feature</text>
+        </g>
+        <text x="250" y="135" class="anno-b" fill="#b45309" transform="rotate(0 250 135)">↙ you branched here</text>
+      </svg>
+      <figcaption>You branched at <b>B</b> and built <b>E</b> and <b>F</b>. But <code>main</code> moved on to <b>C</b> and <b>D</b>. Your feature is now "behind." How do you catch it up?</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ TWO WAYS ============ -->
+  <section id="two-ways">
+    <h2 class="sec"><span class="num">04</span>Two ways to catch up</h2>
+    <p>There are two ways to bring your feature up to date with <code>main</code>. They reach a similar place but tell the story very differently. Flip between them:</p>
+
+    <div class="switcher">
+      <div class="switch-tabs" role="tablist">
+        <button class="active" data-target="p-rebase" role="tab">Rebase</button>
+        <button data-target="p-merge" role="tab">Merge</button>
+      </div>
+
+      <!-- rebase panel -->
+      <div class="switch-panel active" id="p-rebase">
+        <figure>
+          <svg viewBox="0 0 700 160" role="img" aria-label="History after rebasing feature onto main">
+            <line x1="70" y1="80" x2="190" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+            <line x1="190" y1="80" x2="310" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+            <line x1="310" y1="80" x2="430" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+            <line x1="430" y1="80" x2="550" y2="80" stroke="#7fe0b6" stroke-width="3"/>
+            <line x1="550" y1="80" x2="630" y2="80" stroke="#7fe0b6" stroke-width="3"/>
+            <circle cx="70"  cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="190" cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="310" cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="430" cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="550" cy="80" r="25" fill="#10b981"/>
+            <circle cx="630" cy="80" r="25" fill="#10b981"/>
+            <text x="70"  y="86" text-anchor="middle" class="c-label">A</text>
+            <text x="190" y="86" text-anchor="middle" class="c-label">B</text>
+            <text x="310" y="86" text-anchor="middle" class="c-label">C</text>
+            <text x="430" y="86" text-anchor="middle" class="c-label">D</text>
+            <text x="550" y="86" text-anchor="middle" class="c-label" font-size="14">E′</text>
+            <text x="630" y="86" text-anchor="middle" class="c-label" font-size="14">F′</text>
+            <g>
+              <rect x="394" y="118" width="72" height="26" rx="7" fill="#2f7df6"/>
+              <text x="430" y="136" text-anchor="middle" class="ref-text">main</text>
+            </g>
+            <g>
+              <rect x="586" y="118" width="88" height="26" rx="7" fill="#10b981"/>
+              <text x="630" y="136" text-anchor="middle" class="ref-text">feature</text>
+            </g>
+          </svg>
+          <figcaption><b>Rebase</b> rewrites your feature so it looks like you started from <b>D</b> all along. <b>E</b> and <b>F</b> become new commits <b>E′</b> and <b>F′</b>. History is a single straight line — no evidence the branch ever lagged behind.</figcaption>
+        </figure>
+        <p><strong>The trade:</strong> beautifully linear, easy-to-read history. But you have <em>rewritten</em> your commits — the originals are replaced by new ones with new IDs. (Hold that thought; it matters for the <a class="inline" href="#golden">golden rule</a>.)</p>
+      </div>
+
+      <!-- merge panel -->
+      <div class="switch-panel" id="p-merge">
+        <figure>
+          <svg viewBox="0 0 700 250" role="img" aria-label="History after merging main into feature">
+            <line x1="70" y1="80" x2="190" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+            <line x1="190" y1="80" x2="310" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+            <line x1="310" y1="80" x2="430" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+            <line x1="190" y1="80" x2="310" y2="180" stroke="#f0c98a" stroke-width="3"/>
+            <line x1="310" y1="180" x2="430" y2="180" stroke="#f0c98a" stroke-width="3"/>
+            <!-- merge edges into M -->
+            <line x1="430" y1="80"  x2="560" y2="130" stroke="#c4b5fd" stroke-width="3"/>
+            <line x1="430" y1="180" x2="560" y2="130" stroke="#c4b5fd" stroke-width="3"/>
+            <circle cx="70"  cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="190" cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="310" cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="430" cy="80" r="25" fill="#2f7df6"/>
+            <circle cx="310" cy="180" r="25" fill="#f59e0b"/>
+            <circle cx="430" cy="180" r="25" fill="#f59e0b"/>
+            <circle cx="560" cy="130" r="27" fill="#8b5cf6"/>
+            <text x="70"  y="86" text-anchor="middle" class="c-label">A</text>
+            <text x="190" y="86" text-anchor="middle" class="c-label">B</text>
+            <text x="310" y="86" text-anchor="middle" class="c-label">C</text>
+            <text x="430" y="86" text-anchor="middle" class="c-label">D</text>
+            <text x="310" y="186" text-anchor="middle" class="c-label">E</text>
+            <text x="430" y="186" text-anchor="middle" class="c-label">F</text>
+            <text x="560" y="136" text-anchor="middle" class="c-label">M</text>
+            <g>
+              <rect x="524" y="78" width="72" height="26" rx="7" fill="#8b5cf6"/>
+              <text x="560" y="96" text-anchor="middle" class="ref-text">feature</text>
+            </g>
+            <text x="560" y="180" class="anno-b" fill="#7c3aed" text-anchor="middle">merge commit</text>
+          </svg>
+          <figcaption><b>Merge</b> ties the two lines together with a new <b>merge commit M</b> that has <em>two</em> parents (D and F). Nothing is rewritten — E and F keep their identities. The history honestly records "these two lines came together here."</figcaption>
+        </figure>
+        <p><strong>The trade:</strong> completely truthful and non-destructive — but the history becomes a web. Do this many times across many branches and the graph turns into spaghetti.</p>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <span class="ic">🧭</span>
+      <div class="body"><span class="t">One sentence to remember the difference</span>
+        <p><strong>Merge</strong> says <em>"here is exactly what happened."</em> &nbsp;<strong>Rebase</strong> says <em>"let me retell the story as if it had happened cleanly."</em></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section id="how">
+    <h2 class="sec"><span class="num">05</span>How rebase actually works</h2>
+    <p>The name gives it away: <strong>re-base</strong> = give your commits a new <em>base</em>. When you run <code>git rebase main</code> while standing on <code>feature</code>, Git performs a precise little dance:</p>
+
+    <p><strong>1.</strong> Find where the two branches diverged — the most recent commit they <em>share</em>. In our picture that's <strong>B</strong>.<br/>
+    <strong>2.</strong> Take every commit on <code>feature</code> after that point — <strong>E</strong>, then <strong>F</strong> — and save them aside as a list of changes (think: patches).<br/>
+    <strong>3.</strong> Move <code>feature</code>'s starting point to the tip of <code>main</code> — commit <strong>D</strong>.<br/>
+    <strong>4.</strong> Re-apply the saved changes on top of D, one at a time: D + E's changes → <strong>E′</strong>, then E′ + F's changes → <strong>F′</strong>.<br/>
+    <strong>5.</strong> Slide the <code>feature</code> label to the final new commit, <strong>F′</strong>.</p>
+
+    <p>Watch it happen frame by frame:</p>
+
+    <figure>
+      <svg viewBox="0 0 680 430" role="img" aria-label="Step by step replay of commits during a rebase">
+        <!-- ===== Frame 1 ===== -->
+        <text x="20" y="34" class="anno-b" fill="#1f2433">Step 1 — lift your commits off, keep their changes as patches</text>
+        <line x1="70" y1="70" x2="160" y2="70" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="160" y1="70" x2="250" y2="70" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="250" y1="70" x2="340" y2="70" stroke="#cbd5e1" stroke-width="3"/>
+        <circle cx="70" cy="70" r="20" fill="#2f7df6"/><text x="70" y="75" text-anchor="middle" class="c-label" font-size="13">A</text>
+        <circle cx="160" cy="70" r="20" fill="#2f7df6"/><text x="160" y="75" text-anchor="middle" class="c-label" font-size="13">B</text>
+        <circle cx="250" cy="70" r="20" fill="#2f7df6"/><text x="250" y="75" text-anchor="middle" class="c-label" font-size="13">C</text>
+        <circle cx="340" cy="70" r="20" fill="#2f7df6"/><text x="340" y="75" text-anchor="middle" class="c-label" font-size="13">D</text>
+        <rect x="470" y="52" width="58" height="36" rx="8" fill="#fff" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="499" y="75" text-anchor="middle" class="anno-b" fill="#b45309">▤ E</text>
+        <rect x="556" y="52" width="58" height="36" rx="8" fill="#fff" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="585" y="75" text-anchor="middle" class="anno-b" fill="#b45309">▤ F</text>
+        <text x="543" y="112" text-anchor="middle" class="anno">saved patches</text>
+
+        <!-- ===== Frame 2 ===== -->
+        <text x="20" y="174" class="anno-b" fill="#1f2433">Step 2 — replay E on top of D → a new commit E′</text>
+        <line x1="70" y1="210" x2="160" y2="210" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="160" y1="210" x2="250" y2="210" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="250" y1="210" x2="340" y2="210" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="340" y1="210" x2="430" y2="210" stroke="#7fe0b6" stroke-width="3"/>
+        <circle cx="70" cy="210" r="20" fill="#2f7df6"/><text x="70" y="215" text-anchor="middle" class="c-label" font-size="13">A</text>
+        <circle cx="160" cy="210" r="20" fill="#2f7df6"/><text x="160" y="215" text-anchor="middle" class="c-label" font-size="13">B</text>
+        <circle cx="250" cy="210" r="20" fill="#2f7df6"/><text x="250" y="215" text-anchor="middle" class="c-label" font-size="13">C</text>
+        <circle cx="340" cy="210" r="20" fill="#2f7df6"/><text x="340" y="215" text-anchor="middle" class="c-label" font-size="13">D</text>
+        <circle cx="430" cy="210" r="20" fill="#10b981"/><text x="430" y="215" text-anchor="middle" class="c-label" font-size="12">E′</text>
+        <rect x="556" y="192" width="58" height="36" rx="8" fill="#fff" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="585" y="215" text-anchor="middle" class="anno-b" fill="#b45309">▤ F</text>
+        <text x="585" y="252" text-anchor="middle" class="anno">still waiting</text>
+
+        <!-- ===== Frame 3 ===== -->
+        <text x="20" y="314" class="anno-b" fill="#1f2433">Step 3 — replay F on top of E′ → F′. Done!</text>
+        <line x1="70" y1="350" x2="160" y2="350" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="160" y1="350" x2="250" y2="350" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="250" y1="350" x2="340" y2="350" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="340" y1="350" x2="430" y2="350" stroke="#7fe0b6" stroke-width="3"/>
+        <line x1="430" y1="350" x2="520" y2="350" stroke="#7fe0b6" stroke-width="3"/>
+        <circle cx="70" cy="350" r="20" fill="#2f7df6"/><text x="70" y="355" text-anchor="middle" class="c-label" font-size="13">A</text>
+        <circle cx="160" cy="350" r="20" fill="#2f7df6"/><text x="160" y="355" text-anchor="middle" class="c-label" font-size="13">B</text>
+        <circle cx="250" cy="350" r="20" fill="#2f7df6"/><text x="250" y="355" text-anchor="middle" class="c-label" font-size="13">C</text>
+        <circle cx="340" cy="350" r="20" fill="#2f7df6"/><text x="340" y="355" text-anchor="middle" class="c-label" font-size="13">D</text>
+        <circle cx="430" cy="350" r="20" fill="#10b981"/><text x="430" y="355" text-anchor="middle" class="c-label" font-size="12">E′</text>
+        <circle cx="520" cy="350" r="20" fill="#10b981"/><text x="520" y="355" text-anchor="middle" class="c-label" font-size="12">F′</text>
+        <g>
+          <rect x="486" y="384" width="74" height="24" rx="7" fill="#10b981"/>
+          <text x="523" y="401" text-anchor="middle" class="ref-text" font-size="11.5">feature</text>
+        </g>
+      </svg>
+      <figcaption>The commits are replayed in order onto the new base. Each new commit (<b>E′</b>, <b>F′</b>) carries the <em>same changes</em> as its original but has a <em>new parent</em>, and therefore a <em>new ID</em>.</figcaption>
+      <div class="legend">
+        <span><i class="dot" style="background:#2f7df6"></i> main</span>
+        <span><i class="dot" style="background:#f59e0b"></i> original feature commits</span>
+        <span><i class="dot" style="background:#10b981"></i> rebased (new) commits</span>
+      </div>
+    </figure>
+
+    <div class="callout key">
+      <span class="ic">💡</span>
+      <div class="body"><span class="t">Same changes, new commits</span>
+        <p>E′ does the same thing E did, but it is <strong>not</strong> E — it has a different parent and so a different ID. The originals (E, F) are now orphaned and quietly cleaned up later. This is why people say rebasing "rewrites history": it literally builds new history to replace the old.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMMANDS ============ -->
+  <section id="commands">
+    <h2 class="sec"><span class="num">06</span>The commands</h2>
+    <p>The everyday rebase is two lines. Stand on the branch you want to move, then name the branch you want to land on top of:</p>
+    <div class="code-block">
+      <pre><code><span class="cmd">git</span> switch feature      <span class="cmt"># 1. be on the branch you want to move</span>
+<span class="cmd">git</span> rebase main         <span class="cmt"># 2. replay feature's commits on top of main</span></code></pre>
+    </div>
+    <p>That's it — your feature now sits on the latest <code>main</code>. The common next step is to update <code>main</code> itself to include the finished feature. Because feature is now directly ahead of main, this is a clean <strong>fast-forward</strong> (no merge commit needed):</p>
+    <div class="code-block">
+      <pre><code><span class="cmd">git</span> switch main
+<span class="cmd">git</span> merge feature        <span class="cmt"># fast-forward: main just slides up to feature</span></code></pre>
+    </div>
+    <div class="callout tip">
+      <span class="ic">✅</span>
+      <div class="body"><span class="t">A handy shortcut</span>
+        <p>You can rebase a branch without switching to it first by naming both: <code>git rebase main feature</code> means "replay <em>feature</em> onto <em>main</em>." And to pull the latest <code>main</code> and rebase your current branch onto it in one move: <code>git pull --rebase</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INTERACTIVE ============ -->
+  <section id="interactive">
+    <h2 class="sec"><span class="num">07</span>Interactive rebase: editing history on purpose</h2>
+    <p>So far rebase has just <em>moved</em> commits. But its superpower is letting you <strong>edit</strong> them as they replay — reorder, combine, rename, or delete. This is how you turn a messy stream of <code>wip</code>, <code>oops</code>, <code>fix typo</code> commits into one clean, reviewable story before anyone sees it.</p>
+    <p>Add the <code>-i</code> (interactive) flag and tell Git how far back to go:</p>
+    <div class="code-block">
+      <pre><code><span class="cmd">git</span> rebase <span class="flag">-i</span> HEAD~3       <span class="cmt"># edit the last 3 commits</span></code></pre>
+    </div>
+    <p>Git opens a "to-do list" in your editor — your commits, oldest at the top, each with the verb <code>pick</code> in front. You edit the verbs to say what should happen to each commit:</p>
+
+    <div class="rebase-todo" aria-label="An interactive rebase to-do list">
+      <div class="todo-row"><span class="todo-verb v-reword">reword</span><span class="todo-hash">a1b2c3</span><span class="todo-msg">Add login form</span><span class="todo-note">fix the message</span></div>
+      <div class="todo-row"><span class="todo-verb v-squash">squash</span><span class="todo-hash">d4e5f6</span><span class="todo-msg">oops, fix typo in label</span><span class="todo-note">fold into the commit above</span></div>
+      <div class="todo-row"><span class="todo-verb v-drop">drop</span><span class="todo-hash">7a8b9c</span><span class="todo-msg">debug console.log</span><span class="todo-note">delete it entirely</span></div>
+      <div class="todo-row"><span class="todo-verb v-pick">pick</span><span class="todo-hash">0d1e2f</span><span class="todo-msg">Add password validation</span><span class="todo-note">keep as-is</span></div>
+    </div>
+
+    <p>The verbs you'll actually use:</p>
+    <table class="cmp">
+      <thead><tr><th>Verb</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>pick</code></td><td>Keep the commit exactly as it is. (The default.)</td></tr>
+        <tr><td><code>reword</code></td><td>Keep the changes, but let you rewrite the commit message.</td></tr>
+        <tr><td><code>squash</code></td><td>Merge this commit into the one above it, combining both messages.</td></tr>
+        <tr><td><code>fixup</code></td><td>Like squash, but throw away this commit's message — perfect for "oops" commits.</td></tr>
+        <tr><td><code>edit</code></td><td>Pause the rebase here so you can amend the commit's contents.</td></tr>
+        <tr><td><code>drop</code></td><td>Remove the commit entirely. (Deleting the line does the same thing.)</td></tr>
+      </tbody>
+    </table>
+    <p>You can also <strong>reorder</strong> commits just by moving their lines up or down. Save the file, close it, and Git replays everything according to your instructions. Three scrappy commits become one polished one.</p>
+
+    <div class="callout tip">
+      <span class="ic">🧼</span>
+      <div class="body"><span class="t">The classic use</span>
+        <p>Right before opening a pull request, run <code>git rebase -i</code> to squash your "work-in-progress" commits into a couple of meaningful ones with clear messages. Reviewers see a clean story instead of your thinking-out-loud.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GOLDEN RULE ============ -->
+  <section id="golden">
+    <h2 class="sec"><span class="num">08</span>The golden rule of rebasing</h2>
+    <div class="callout danger">
+      <span class="ic">⚠️</span>
+      <div class="body"><span class="t">Never rebase commits that other people already have.</span>
+        <p>In practice: don't rebase anything you've pushed to a shared branch (like <code>main</code>) that teammates may have pulled or built on top of.</p>
+      </div>
+    </div>
+    <p>Here's <em>why</em>, and it follows directly from everything above. Rebasing <strong>replaces</strong> commits with new ones that have new IDs. If you rewrite commits that someone else already has, your history and their history now disagree about what "the same commit" even is. When they next pull, Git sees two divergent versions of the past and you get duplicated commits, ugly conflicts, and a very confused team.</p>
+
+    <figure>
+      <svg viewBox="0 0 640 290" role="img" aria-label="Why rebasing shared history causes divergence">
+        <text x="20" y="34" class="anno-b" fill="#1f2433">Everyone's shared history (already pushed):</text>
+        <line x1="70" y1="80" x2="190" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="190" y1="80" x2="310" y2="80" stroke="#cbd5e1" stroke-width="3"/>
+        <circle cx="70" cy="80" r="24" fill="#2f7df6"/><text x="70" y="86" text-anchor="middle" class="c-label">A</text>
+        <circle cx="190" cy="80" r="24" fill="#2f7df6"/><text x="190" y="86" text-anchor="middle" class="c-label">B</text>
+        <circle cx="310" cy="80" r="24" fill="#2f7df6"/><text x="310" y="86" text-anchor="middle" class="c-label">C</text>
+        <text x="360" y="86" class="anno">← teammates have this</text>
+
+        <text x="20" y="174" class="anno-b" fill="#b91c1c">After you rebase &amp; force-push (B and C rewritten):</text>
+        <line x1="70" y1="220" x2="190" y2="220" stroke="#cbd5e1" stroke-width="3"/>
+        <line x1="190" y1="220" x2="310" y2="220" stroke="#fca5a5" stroke-width="3"/>
+        <circle cx="70" cy="220" r="24" fill="#2f7df6"/><text x="70" y="226" text-anchor="middle" class="c-label">A</text>
+        <circle cx="190" cy="220" r="24" fill="#ef4444"/><text x="190" y="226" text-anchor="middle" class="c-label" font-size="14">B′</text>
+        <circle cx="310" cy="220" r="24" fill="#ef4444"/><text x="310" y="226" text-anchor="middle" class="c-label" font-size="14">C′</text>
+        <text x="360" y="226" class="anno" fill="#b91c1c">← you have this now</text>
+
+        <text x="320" y="276" text-anchor="middle" class="anno-b" fill="#b91c1c">💥 B≠B′ and C≠C′ — the team's next pull turns into a mess</text>
+      </svg>
+      <figcaption>The same changes now exist under two different identities. Git can't tell they're "the same," so it tries to keep both — duplicating commits and generating conflicts for everyone downstream.</figcaption>
+    </figure>
+
+    <div class="callout tip">
+      <span class="ic">🛟</span>
+      <div class="body"><span class="t">The safe zone</span>
+        <p>Rebase freely on <strong>your own local, unshared branches</strong> — that's exactly what they're for. The classic safe workflow: rebase your private feature branch onto the latest <code>main</code> right before opening or updating your pull request. Private history? Rewrite away. Shared history? Hands off.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FORCE PUSH ============ -->
+  <section id="force">
+    <h2 class="sec"><span class="num">09</span>Force-pushing (safely)</h2>
+    <p>Here's a wrinkle: once you rebase a branch you've <em>already pushed</em>, your local history no longer matches the remote's. A normal <code>git push</code> gets rejected — Git is protecting you from accidentally erasing remote commits. To publish your rewritten branch, you have to overwrite the remote copy. Do it with the safety catch on:</p>
+    <div class="code-block">
+      <pre><code><span class="cmd">git</span> push <span class="flag">--force-with-lease</span></code></pre>
+    </div>
+    <p><code>--force-with-lease</code> only overwrites the remote branch <strong>if nobody else has pushed to it since you last looked</strong>. If someone has, it refuses — saving you from stomping on a teammate's work. Always prefer it over the blunt <code>--force</code>, which overwrites unconditionally.</p>
+    <div class="callout warn">
+      <span class="ic">⚠️</span>
+      <div class="body"><span class="t">Force-push only your own branches</span>
+        <p>This is the golden rule in action. Force-pushing your personal feature/PR branch is normal and fine. Force-pushing a shared branch like <code>main</code> is how you ruin a Friday afternoon for the whole team.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESCUE ============ -->
+  <section id="rescue">
+    <h2 class="sec"><span class="num">10</span>When things go wrong</h2>
+
+    <h3>Conflicts during a rebase</h3>
+    <p>Because rebase re-applies your commits one at a time, a conflict can surface at <em>each</em> step (when a replayed change clashes with the new base). Git pauses, tells you which files conflict, and waits. You resolve it the same way you'd resolve any merge conflict, then keep going:</p>
+    <div class="code-block">
+      <pre><code><span class="cmt"># edit the conflicted files to fix them, then:</span>
+<span class="cmd">git</span> add &lt;files&gt;
+<span class="cmd">git</span> rebase <span class="flag">--continue</span>     <span class="cmt"># resume with the next commit</span>
+
+<span class="cmd">git</span> rebase <span class="flag">--skip</span>         <span class="cmt"># skip the current commit (rarely needed)</span>
+<span class="cmd">git</span> rebase <span class="flag">--abort</span>        <span class="cmt"># bail out and return to exactly how things were</span></code></pre>
+    </div>
+    <p>It can feel like more work than a merge, but it's the same total effort spread into smaller, clearer pieces — and <code>--abort</code> always gives you a clean escape hatch back to the start.</p>
+
+    <h3>The undo button: <code>reflog</code></h3>
+    <p>This is the safety net that makes rebasing low-risk: Git keeps a private journal of every place <code>HEAD</code> has been, called the <strong>reflog</strong>. Even after a rebase "rewrites" history, the old commits aren't truly gone yet — they're still there, just unlabeled. The reflog lets you find them and jump back:</p>
+    <div class="code-block">
+      <pre><code><span class="cmd">git</span> reflog                  <span class="cmt"># list everywhere HEAD has been, newest first</span>
+<span class="cmd">git</span> reset <span class="flag">--hard</span> HEAD@{5}    <span class="cmt"># travel back to how things were 5 moves ago</span></code></pre>
+    </div>
+    <div class="callout key">
+      <span class="ic">🧯</span>
+      <div class="body"><span class="t">Rebase with confidence</span>
+        <p>Because the reflog remembers the "before" state, almost any rebase can be undone. Knowing your <code>--abort</code> and <code>reflog</code> escape hatches is what lets you experiment freely instead of fearing every rebase.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DECISION ============ -->
+  <section id="decision">
+    <h2 class="sec"><span class="num">11</span>Merge vs rebase: which, when?</h2>
+    <p>Neither is "better" — they're tools for different jobs. The deciding question is almost always: <strong>is this history private to me, or shared with others?</strong></p>
+    <table class="cmp">
+      <thead><tr><th></th><th>Rebase</th><th>Merge</th></tr></thead>
+      <tbody>
+        <tr><td>Resulting history</td><td>Straight, linear line</td><td>Branches with merge commits</td></tr>
+        <tr><td>Rewrites commits?</td><td class="no">Yes (new IDs)</td><td class="yes">No (preserves originals)</td></tr>
+        <tr><td>Records true timeline?</td><td class="no">No — it's an idealized retelling</td><td class="yes">Yes — exactly what happened</td></tr>
+        <tr><td>Safe on shared branches?</td><td class="no">No</td><td class="yes">Yes</td></tr>
+        <tr><td>Best for…</td><td>Tidying your <em>own</em> branch before sharing; keeping main linear</td><td>Combining shared branches; preserving real history</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note">
+      <span class="ic">🧭</span>
+      <div class="body"><span class="t">Rule of thumb</span>
+        <p><strong>Rebase to tidy what's private. Merge to record what's public.</strong> A very common professional workflow combines both: rebase your feature branch onto the latest <code>main</code> to keep it clean and current, then merge the finished feature into <code>main</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REFERENCE ============ -->
+  <section id="reference">
+    <h2 class="sec"><span class="num">12</span>Quick reference</h2>
+    <div class="ref-grid">
+      <div class="ref-card">
+        <h4>Everyday rebase</h4>
+        <p class="d">Move your branch on top of the latest main.</p>
+        <code>git switch feature</code>
+        <code>git rebase main</code>
+      </div>
+      <div class="ref-card">
+        <h4>Clean up commits</h4>
+        <p class="d">Squash / reword / reorder the last N commits.</p>
+        <code>git rebase -i HEAD~N</code>
+      </div>
+      <div class="ref-card">
+        <h4>Pull + rebase</h4>
+        <p class="d">Get latest and replay your work on top.</p>
+        <code>git pull --rebase</code>
+      </div>
+      <div class="ref-card">
+        <h4>Publish a rewritten branch</h4>
+        <p class="d">Safely overwrite your own remote branch.</p>
+        <code>git push --force-with-lease</code>
+      </div>
+      <div class="ref-card">
+        <h4>Mid-rebase controls</h4>
+        <p class="d">When a conflict pauses the rebase.</p>
+        <code>git rebase --continue</code>
+        <code>git rebase --abort</code>
+      </div>
+      <div class="ref-card">
+        <h4>Undo a rebase</h4>
+        <p class="d">Find the "before" state and jump back.</p>
+        <code>git reflog</code>
+        <code>git reset --hard HEAD@{n}</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAKEAWAYS ============ -->
+  <div class="takeaways">
+    <h2>The five things to remember</h2>
+    <ul>
+      <li><span class="k">🏷️</span><span class="tx"><b>A branch is just a movable label</b>, and a commit is a snapshot plus a pointer to its parent.</span></li>
+      <li><span class="k">🔁</span><span class="tx"><b>Rebase = replay your commits onto a new base.</b> Same changes, brand-new commit IDs.</span></li>
+      <li><span class="k">✨</span><span class="tx">It trades the <b>true</b> history for a <b>clean, linear</b> one — great for readability.</span></li>
+      <li><span class="k">⚠️</span><span class="tx"><b>Golden rule:</b> never rebase commits others already have. Rewrite private history only.</span></li>
+      <li><span class="k">🧯</span><span class="tx"><b><code style="background:rgba(255,255,255,.15);color:#fff;border:none">git reflog</code> is your undo button</b> — which is exactly why you can rebase fearlessly.</span></li>
+    </ul>
+  </div>
+
+  <p style="text-align:center;margin-top:40px;color:var(--muted)">Now go make a throwaway repo and try it. Break it on purpose. <code>git reflog</code> will bring you back every time. 🌱</p>
+
+</main>
+
+<footer>
+  Part of the <a href="../index.html">Learning</a> series · explained from first principles.<br/>
+  <span style="color:var(--faint);font-size:13px">Made to be understood, not memorized.</span>
+</footer>
+
+<script>
+  // scroll progress bar
+  var bar = document.getElementById('progress');
+  function onScroll() {
+    var h = document.documentElement;
+    var scrolled = h.scrollTop / (h.scrollHeight - h.clientHeight);
+    bar.style.width = (scrolled * 100) + '%';
+  }
+  document.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // merge / rebase switcher
+  document.querySelectorAll('.switch-tabs button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.switch-tabs button').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.switch-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.target).classList.add('active');
+    });
+  });
+
+  // copy buttons on code blocks
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', function () {
+      var code = block.querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(function () {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1600);
+      });
+    });
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>

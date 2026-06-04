@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Learning</title>
+<meta name="description" content="Topics explained from first principles." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fbfbfc;
+    --text: #18181b;
+    --muted: #71717a;
+    --faint: #a1a1aa;
+    --line: #ececef;
+    --accent: #5b51e8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .page { max-width: 640px; margin: 0 auto; padding: 120px 28px 100px; }
+
+  h1 {
+    font-size: clamp(2.3rem, 6vw, 3.1rem);
+    font-weight: 800; letter-spacing: -0.035em; margin: 0 0 44px; color: var(--text);
+  }
+
+  .list { border-top: 1px solid var(--line); }
+  .item {
+    display: flex; gap: 22px; align-items: baseline;
+    padding: 26px 6px; border-bottom: 1px solid var(--line);
+    text-decoration: none; color: inherit;
+    transition: padding-left .2s ease;
+  }
+  .item:hover { padding-left: 12px; }
+  .item .idx {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--faint); padding-top: 4px; min-width: 22px;
+  }
+  .item .body { flex: 1; }
+  .item .t {
+    display: block;
+    font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em;
+    transition: color .18s ease;
+  }
+  .item .d { display: block; color: var(--muted); font-size: .96rem; margin-top: 3px; }
+  .item .arrow { color: var(--faint); font-size: 1.1rem; transition: transform .2s ease, color .18s ease; align-self: center; }
+  .item:hover .t { color: var(--accent); }
+  .item:hover .arrow { transform: translateX(4px); color: var(--accent); }
+
+  footer { margin-top: 56px; }
+  footer a { color: var(--faint); text-decoration: none; font-size: 13px; }
+  footer a:hover { color: var(--accent); }
+
+  ::selection { background: #ddd6fe; color: #18181b; }
+</style>
+</head>
+<body>
+  <main class="page">
+    <h1>Learning</h1>
+
+    <nav class="list">
+      <a class="item" href="lessons/git-rebasing.html">
+        <span class="idx">01</span>
+        <span class="body">
+          <span class="t">How Git Rebasing Works</span>
+          <span class="d">Merge vs rebase, the replay model, interactive rebase, and the golden rule.</span>
+        </span>
+        <span class="arrow">→</span>
+      </a>
+    </nav>
+
+    <footer>
+      <a href="https://github.com/sarthak-r/learning">GitHub ↗</a>
+    </footer>
+  </main>
+</body>
+</html>
