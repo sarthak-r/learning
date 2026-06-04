@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Browser Agents, Explained — Learning</title>
+<meta name="description" content="What browser agents are, where they actually stand in 2026, how to integrate one into a B2B SaaS product, the managed services available, and the benefits, limits, and security risks." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 780px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 840px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2.1rem, 5vw, 3.2rem); line-height: 1.08; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 30%, #5b51e8 75%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 640px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 780px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin: 56px 0 6px; line-height: 1.2; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .95rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.12rem; font-weight: 700; margin: 28px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.1rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .88em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .code-block { position: relative; margin: 18px 0; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 13.5px; line-height: 1.6; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .cmt { color: #7e89a8; }
+  .code-block .kw { color: #c4b5fd; }
+  .code-block .fn { color: #7ee0b8; }
+  .code-block .str { color: #9fb4ff; }
+  .copy-btn { position: absolute; top: 9px; right: 9px; background: rgba(255,255,255,.08); color: #cdd3e6; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s ease; opacity: 0; }
+  .code-block:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+  .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; }
+  .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout.tip { background: var(--tip-soft); border-color: #c7f0dd; } .callout.tip .t { color: #047857; }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.danger { background: var(--danger-soft); border-color: #fbd2d2; } .callout.danger .t { color: #b91c1c; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14.5px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 12px 15px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+  table.t .cat { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+  .cat.model { background: #ede9fe; color: #6d28d9; }
+  .cat.infra { background: #d1fae5; color: #047857; }
+  .cat.fw { background: #dbeafe; color: #1d4ed8; }
+  table.t .yes { color: #047857; font-weight: 600; } table.t .no { color: #b91c1c; font-weight: 600; } table.t .mid { color: #b45309; font-weight: 600; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .panel h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+  .panel.good h4 { color: #047857; } .panel.bad h4 { color: #b91c1c; }
+  .panel ul { margin: 0; padding-left: 0; list-style: none; }
+  .panel li { padding-left: 22px; position: relative; margin: 8px 0; font-size: .96rem; color: #2b3142; }
+  .panel.good li::before { content: "✓"; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+  .panel.bad li::before { content: "✕"; position: absolute; left: 0; color: #ef4444; font-weight: 700; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 5px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Browser Agents</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🤖 AI · Browser Agents</span>
+  <h1>Browser Agents, Explained</h1>
+  <p class="lede">An LLM that drives a real web browser — clicking, typing, reading pages — to finish a goal you describe in plain English. What they are, where they actually stand in 2026, and how to ship one inside a B2B product.</p>
+  <div class="meta-row">
+    <span>⏱️ ~12 min</span>
+    <span>🏢 B2B / practical focus</span>
+    <span>🔎 Researched June 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#what">What a browser agent is</a></li>
+    <li><a href="#see">How it "sees" the web</a></li>
+    <li><a href="#now">Where things stand (2026)</a></li>
+    <li><a href="#integrate">Integrating it in your SaaS</a></li>
+    <li><a href="#services">Managed services available</a></li>
+    <li><a href="#benefits">Benefits &amp; limitations</a></li>
+    <li><a href="#security">Security: the trifecta</a></li>
+    <li><a href="#decision">Use it / skip it</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 WHAT -->
+  <section id="what">
+    <h2 class="sec"><span class="num">01</span>What a browser agent is</h2>
+    <p class="lead-in">A browser agent is an LLM placed in a loop where it <b>perceives</b> a web page, <b>reasons</b> about your goal, and <b>acts</b> on the page (click, type, navigate) — repeating until the task is done. No hard-coded steps; it decides each move from what's currently on screen.</p>
+
+    <p>It sits between two older approaches — and earns its place only when both fall short:</p>
+    <table class="t">
+      <thead><tr><th>Approach</th><th>How it works</th><th>Fails when…</th></tr></thead>
+      <tbody>
+        <tr><td>Direct API</td><td>Call the service's API. Cleanest, fastest, deterministic.</td><td>No API exists, or access isn't permitted.</td></tr>
+        <tr><td>Scripted (Selenium / Playwright)</td><td>Hard-coded selectors and steps replay an exact sequence.</td><td>The UI changes — selectors break, constantly.</td></tr>
+        <tr><td>Browser agent</td><td>LLM chooses actions live from the rendered page.</td><td>Rarely breaks on UI change — but is slower &amp; non-deterministic.</td></tr>
+      </tbody>
+    </table>
+
+    <figure>
+      <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The agent loop: perceive, reason, act, repeat until the goal is met">
+        <!-- start -->
+        <rect x="14" y="84" width="78" height="46" rx="11" fill="#1f2433"/>
+        <text x="53" y="112" text-anchor="middle" fill="#fff" font-family="Inter" font-weight="600" font-size="14">Goal</text>
+        <!-- perceive -->
+        <rect x="138" y="74" width="150" height="66" rx="13" fill="#2f7df6"/>
+        <text x="213" y="101" text-anchor="middle" fill="#fff" font-family="Inter" font-weight="700" font-size="15">Perceive</text>
+        <text x="213" y="122" text-anchor="middle" fill="#dbeafe" font-family="Inter" font-size="11.5">screenshot + DOM</text>
+        <!-- reason -->
+        <rect x="320" y="74" width="150" height="66" rx="13" fill="#5b51e8"/>
+        <text x="395" y="101" text-anchor="middle" fill="#fff" font-family="Inter" font-weight="700" font-size="15">Reason</text>
+        <text x="395" y="122" text-anchor="middle" fill="#ddd9ff" font-family="Inter" font-size="11.5">LLM plans next step</text>
+        <!-- act -->
+        <rect x="502" y="74" width="150" height="66" rx="13" fill="#f59e0b"/>
+        <text x="577" y="101" text-anchor="middle" fill="#fff" font-family="Inter" font-weight="700" font-size="15">Act</text>
+        <text x="577" y="122" text-anchor="middle" fill="#fff7e6" font-family="Inter" font-size="11.5">click · type · navigate</text>
+        <!-- done -->
+        <rect x="640" y="200" width="66" height="40" rx="11" fill="#10b981"/>
+        <text x="673" y="225" text-anchor="middle" fill="#fff" font-family="Inter" font-weight="700" font-size="13">Done ✓</text>
+        <!-- arrows -->
+        <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <line x1="92" y1="107" x2="132" y2="107" stroke="#9aa3b8" stroke-width="2.5" marker-end="url(#ah)"/>
+        <line x1="288" y1="107" x2="314" y2="107" stroke="#9aa3b8" stroke-width="2.5" marker-end="url(#ah)"/>
+        <line x1="470" y1="107" x2="496" y2="107" stroke="#9aa3b8" stroke-width="2.5" marker-end="url(#ah)"/>
+        <!-- loop back act->perceive -->
+        <path d="M577,140 L577,182 L213,182 L213,144" fill="none" stroke="#9aa3b8" stroke-width="2.5" stroke-dasharray="5 4" marker-end="url(#ah)"/>
+        <text x="395" y="176" text-anchor="middle" fill="#5b6478" font-family="Inter" font-size="12" font-weight="600">observe result → repeat</text>
+        <!-- done branch -->
+        <path d="M620,140 L660,196" fill="none" stroke="#10b981" stroke-width="2.5" marker-end="url(#ah)"/>
+        <text x="678" y="170" text-anchor="middle" fill="#047857" font-family="Inter" font-size="11.5" font-weight="600">goal met</text>
+      </svg>
+      <figcaption><b>The core loop.</b> Everything else — frameworks, infra, models — is plumbing around this perceive → reason → act cycle.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 02 SEE -->
+  <section id="see">
+    <h2 class="sec"><span class="num">02</span>How it "sees" the web</h2>
+    <p>One technical choice shapes cost, speed, and reliability: <b>how the agent perceives the page.</b></p>
+    <table class="t">
+      <thead><tr><th>Paradigm</th><th>Perceives via</th><th>Strengths</th><th>Weak spots</th></tr></thead>
+      <tbody>
+        <tr><td>DOM / a11y tree</td><td>Parses HTML &amp; accessibility elements</td><td>Fast, cheap, precise on standard apps</td><td>Blind to canvas/maps/images; odd DOMs confuse it</td></tr>
+        <tr><td>Vision (pixels)</td><td>Screenshots → click coordinates</td><td>Universal — sees what a human sees; handles legacy &amp; visual UIs</td><td>Slower, costlier, less pixel-precise</td></tr>
+        <tr><td>Hybrid</td><td>Both, together</td><td>Best reliability — the production default</td><td>More moving parts</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.96rem;color:var(--muted)">Rule of thumb: <b>DOM-first</b> for your own/standard web apps (cheap, repeatable); <b>vision</b> for legacy, canvas, or unpredictable third-party sites where "the DOM is a lie."</p>
+  </section>
+
+  <!-- 03 NOW -->
+  <section id="now">
+    <h2 class="sec"><span class="num">03</span>Where things stand (2026)</h2>
+    <ul class="tight">
+      <li><b>The pivot to API-first.</b> The "do-anything" consumer agent hype cooled; maturity (and money) moved to developer APIs + infrastructure. Google <b>retired Project Mariner</b> (May 2026); OpenAI folded Operator into ChatGPT Agent. Build on APIs, not chat demos.</li>
+      <li><b>Capability.</b> Good enough for multi-step tasks on mainstream sites <b>under supervision</b>. Screen-understanding accuracy roughly doubled in two years (≈70% → 90%+).</li>
+      <li><b>Benchmarks are rising — but don't trust them.</b> Headline scores look strong (WebVoyager ≈85–90%; WebArena ≈60–69%; OSWorld climbing fast), yet UC Berkeley (Apr 2026) showed <b>all 8 major agent benchmarks can be reward-hacked</b> to near-perfect without doing the task, and WebArena's string-matching inflates results. <b>Pilot on your own workflows; ignore the leaderboard.</b></li>
+      <li><b>Standardization.</b> <b>MCP</b> (Model Context Protocol) became a vendor-neutral standard under the Linux Foundation (Feb 2026) for wiring agents to tools and data.</li>
+    </ul>
+    <div class="callout key"><span class="ic">🎯</span><div class="body"><span class="t">Verdict</span><p>Production-ready for <b>narrow, well-scoped, supervised</b> web tasks. <b>Not</b> ready for unsupervised, high-stakes autonomy.</p></div></div>
+  </section>
+
+  <!-- 04 INTEGRATE -->
+  <section id="integrate">
+    <h2 class="sec"><span class="num">04</span>Integrating it in your SaaS</h2>
+    <p>A production browser-agent feature is a stack of four layers. You rent the middle two and own the top.</p>
+
+    <figure>
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four-layer browser agent stack">
+        <!-- layer 1 -->
+        <rect x="40" y="20" width="470" height="62" rx="12" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="64" y="46" fill="#4338ca" font-family="Inter" font-weight="700" font-size="15">Your B2B SaaS app  <tspan font-weight="500" font-size="12" fill="#6d6aa8">(you own this)</tspan></text>
+        <text x="64" y="68" fill="#5b6478" font-family="Inter" font-size="12">orchestration · multi-tenancy · per-tenant secrets · human-in-the-loop · audit</text>
+        <!-- layer 2 -->
+        <rect x="40" y="96" width="470" height="62" rx="12" fill="#dbeafe" stroke="#a8c7fb" stroke-width="1.5"/>
+        <text x="64" y="122" fill="#1d4ed8" font-family="Inter" font-weight="700" font-size="15">Agent framework</text>
+        <text x="64" y="144" fill="#5b6478" font-family="Inter" font-size="12">Browser Use · Stagehand · Skyvern — turns goals into browser actions</text>
+        <!-- layer 3 -->
+        <rect x="40" y="172" width="470" height="62" rx="12" fill="#d1fae5" stroke="#9ae6c4" stroke-width="1.5"/>
+        <text x="64" y="198" fill="#047857" font-family="Inter" font-weight="700" font-size="15">Browser infrastructure</text>
+        <text x="64" y="220" fill="#5b6478" font-family="Inter" font-size="12">Browserbase · Steel · Hyperbrowser — cloud browsers, proxies, CAPTCHA, replay</text>
+        <!-- layer 4 -->
+        <rect x="40" y="248" width="470" height="62" rx="12" fill="#f1f1f6" stroke="#d8dae6" stroke-width="1.5"/>
+        <text x="64" y="274" fill="#3b3f55" font-family="Inter" font-weight="700" font-size="15">Target websites</text>
+        <text x="64" y="296" fill="#5b6478" font-family="Inter" font-size="12">third-party portals · legacy apps · no-API systems</text>
+        <!-- model side box -->
+        <rect x="556" y="96" width="132" height="138" rx="12" fill="#ede9fe" stroke="#cbb9fb" stroke-width="1.5"/>
+        <text x="622" y="130" text-anchor="middle" fill="#6d28d9" font-family="Inter" font-weight="700" font-size="14">LLM brain</text>
+        <text x="622" y="153" text-anchor="middle" fill="#7c5cf0" font-family="Inter" font-size="11.5">computer-use</text>
+        <text x="622" y="172" text-anchor="middle" fill="#5b6478" font-family="Inter" font-size="11.5">Claude</text>
+        <text x="622" y="189" text-anchor="middle" fill="#5b6478" font-family="Inter" font-size="11.5">GPT (CUA)</text>
+        <text x="622" y="206" text-anchor="middle" fill="#5b6478" font-family="Inter" font-size="11.5">Gemini</text>
+        <!-- connectors -->
+        <defs><marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#b8bccd"/></marker></defs>
+        <line x1="275" y1="82" x2="275" y2="94" stroke="#b8bccd" stroke-width="2"/>
+        <line x1="275" y1="158" x2="275" y2="170" stroke="#b8bccd" stroke-width="2"/>
+        <line x1="275" y1="234" x2="275" y2="246" stroke="#b8bccd" stroke-width="2"/>
+        <line x1="554" y1="127" x2="514" y2="127" stroke="#a78bfa" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#ah2)"/>
+      </svg>
+      <figcaption><b>The stack.</b> The agent framework calls the model to decide actions, and executes them on a cloud browser pointed at the target site.</figcaption>
+    </figure>
+
+    <h3>Three ways to build</h3>
+    <table class="t">
+      <thead><tr><th>Option</th><th>Stack</th><th>Ship speed</th><th>Control</th><th>Best for</th></tr></thead>
+      <tbody>
+        <tr><td>Managed agent API</td><td>One vendor = model + browser (OpenAI CUA, Anthropic Computer Use, Nova Act)</td><td class="yes">Fastest</td><td class="no">Lowest</td><td>Prototypes, simple flows</td></tr>
+        <tr><td>Framework + infra + your model</td><td>Stagehand/Browser Use + Browserbase/Steel + Claude/GPT</td><td class="mid">Medium</td><td class="yes">High</td><td><b>Production sweet spot</b></td></tr>
+        <tr><td>Self-host</td><td>Playwright + Browser Use + your LLM on your infra</td><td class="no">Slowest</td><td class="yes">Max</td><td>Strict data residency / cost at scale</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Non-negotiables for B2B</h3>
+    <ul class="tight">
+      <li><b>Per-tenant credential vault</b> — scope secrets per org; never hard-code; inject at runtime.</li>
+      <li><b>Human-in-the-loop gates</b> — require approval for sensitive or irreversible actions (payments, sends, deletes).</li>
+      <li><b>Isolated, ephemeral sessions</b> — one fresh browser per task/tenant; no shared cookies.</li>
+      <li><b>Full observability</b> — record &amp; replay every session + step logs, for debugging and audit.</li>
+      <li><b>Guardrails</b> — domain allow-lists, action limits, spend caps.</li>
+      <li><b>Proxies + CAPTCHA handling</b> — table stakes for real third-party sites.</li>
+    </ul>
+
+    <p>Concretely, a framework lets you script in natural language instead of selectors:</p>
+    <div class="code-block"><pre><code><span class="cmt">// Stagehand — natural-language actions on a managed cloud browser</span>
+<span class="kw">const</span> page = stagehand.page;
+<span class="kw">await</span> page.<span class="fn">goto</span>(<span class="str">"https://portal.vendor.com"</span>);
+<span class="kw">await</span> page.<span class="fn">act</span>(<span class="str">"log in with the saved credentials"</span>);
+<span class="kw">await</span> page.<span class="fn">act</span>(<span class="str">"open the most recent invoice"</span>);
+<span class="kw">const</span> invoice = <span class="kw">await</span> page.<span class="fn">extract</span>({ schema: InvoiceSchema }); <span class="cmt">// structured output</span></code></pre></div>
+  </section>
+
+  <!-- 05 SERVICES -->
+  <section id="services">
+    <h2 class="sec"><span class="num">05</span>Managed services available</h2>
+    <p>Three categories: the <span class="cat model">model</span> (the brain), the <span class="cat infra">infra</span> (cloud browsers), and the <span class="cat fw">framework</span> (goal → actions). Most teams combine one of each.</p>
+    <table class="t">
+      <thead><tr><th>Service</th><th>Type</th><th>What it gives you</th></tr></thead>
+      <tbody>
+        <tr><td>Anthropic Computer Use</td><td><span class="cat model">model</span></td><td>Claude drives a browser/computer. Via Anthropic API, Bedrock, Vertex; + "Claude for Chrome" extension. Strong safety posture. Beta.</td></tr>
+        <tr><td>OpenAI CUA</td><td><span class="cat model">model</span></td><td>Computer-Using Agent behind Operator/Atlas; available via API. High benchmark scores.</td></tr>
+        <tr><td>Google Gemini (computer use)</td><td><span class="cat model">model</span></td><td>Mariner's tech, now offered through the Gemini API.</td></tr>
+        <tr><td>Amazon Nova Act</td><td><span class="cat model">model</span></td><td>Browser-action SDK in the AWS/Bedrock ecosystem.</td></tr>
+        <tr><td>Browserbase</td><td><span class="cat infra">infra</span></td><td>Market-leading cloud browser fleet; session replay, proxies, stealth. Ships the <b>Stagehand</b> framework.</td></tr>
+        <tr><td>Steel.dev</td><td><span class="cat infra">infra</span></td><td>Open-source cloud/self-host browsers; cheaper, generous free tier.</td></tr>
+        <tr><td>Hyperbrowser / Anchor / Browserless / Bright Data</td><td><span class="cat infra">infra</span></td><td>Managed browsers with CAPTCHA bypass, proxies, scraping-grade networks.</td></tr>
+        <tr><td>Browser Use</td><td><span class="cat fw">framework</span></td><td>Most popular OSS framework; Python; goal → reasoning loop. Huge community.</td></tr>
+        <tr><td>Stagehand</td><td><span class="cat fw">framework</span></td><td>TypeScript; extends Playwright with <code>act/extract/observe</code>; caching makes repeat runs near-free.</td></tr>
+        <tr><td>Skyvern</td><td><span class="cat fw">framework</span></td><td>Vision-first OSS; excels on legacy, visual, and form-heavy sites.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note"><span class="ic">🧩</span><div class="body"><span class="t">Typical production combo</span><p>Framework (<b>Stagehand</b> or <b>Browser Use</b>) + managed infra (<b>Browserbase</b> or <b>Steel</b>) + a computer-use model (<b>Claude</b>, <b>GPT</b>, or <b>Gemini</b>).</p></div></div>
+  </section>
+
+  <!-- 06 / 07 BENEFITS + LIMITS -->
+  <section id="benefits">
+    <h2 class="sec"><span class="num">06</span>Benefits &amp; limitations</h2>
+    <span id="limits"></span>
+    <div class="two-col">
+      <div class="panel good">
+        <h4>✓ Benefits</h4>
+        <ul>
+          <li><b>No API required</b> — automate any web app, including legacy &amp; third-party portals you don't own.</li>
+          <li><b>Self-healing</b> — adapts to UI changes; far less upkeep than selector scripts.</li>
+          <li><b>Built in English</b> — describe the goal; skip brittle step-by-step code.</li>
+          <li><b>One agent, many sites</b> — covers the long tail of one-off tasks.</li>
+          <li><b>Works behind logins</b> — does the human-in-a-browser work humans do.</li>
+        </ul>
+      </div>
+      <div class="panel bad">
+        <h4>✕ Limitations</h4>
+        <ul>
+          <li><b>Non-deterministic</b> — can fail or wander on long flows; needs retries + oversight.</li>
+          <li><b>Slow</b> — each step is a screenshot + model call; seconds per action.</li>
+          <li><b>Cost</b> — vision tokens add up over long sessions and at scale.</li>
+          <li><b>Security</b> — prompt injection is real and unsolved (see §08).</li>
+          <li><b>Blocked</b> — MFA, CAPTCHAs, bot detection, and ToS limits.</li>
+          <li><b>Hard to audit</b> — non-determinism complicates compliance.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 SECURITY -->
+  <section id="security">
+    <h2 class="sec"><span class="num">07</span>Security: the lethal trifecta</h2>
+    <p>Web pages are <b>untrusted input</b>. An agent tends to treat page text as instructions — so a hidden line in a page, email, or PDF can hijack it. This is <b>prompt injection</b>, and risk peaks when an agent has all three of these at once:</p>
+
+    <figure>
+      <svg viewBox="0 0 520 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The lethal trifecta Venn diagram">
+        <circle cx="260" cy="150" r="118" fill="#ef4444" fill-opacity="0.18" stroke="#ef4444" stroke-width="1.5"/>
+        <circle cx="192" cy="262" r="118" fill="#2f7df6" fill-opacity="0.16" stroke="#2f7df6" stroke-width="1.5"/>
+        <circle cx="328" cy="262" r="118" fill="#f59e0b" fill-opacity="0.18" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="260" y="70" text-anchor="middle" fill="#b91c1c" font-family="Inter" font-weight="700" font-size="14">Private data</text>
+        <text x="260" y="88" text-anchor="middle" fill="#7a2c2c" font-family="Inter" font-size="11.5">tenant's logged-in data</text>
+        <text x="96" y="320" text-anchor="middle" fill="#1d4ed8" font-family="Inter" font-weight="700" font-size="14">Untrusted content</text>
+        <text x="96" y="338" text-anchor="middle" fill="#2c4a7a" font-family="Inter" font-size="11.5">the open web</text>
+        <text x="424" y="320" text-anchor="middle" fill="#b45309" font-family="Inter" font-weight="700" font-size="14">Can act / send</text>
+        <text x="424" y="338" text-anchor="middle" fill="#7a5320" font-family="Inter" font-size="11.5">pay · email · call APIs</text>
+        <text x="260" y="228" text-anchor="middle" fill="#7f1d1d" font-family="Inter" font-weight="800" font-size="14">⚠ danger</text>
+        <text x="260" y="246" text-anchor="middle" fill="#7f1d1d" font-family="Inter" font-size="11">exfiltration /</text>
+        <text x="260" y="261" text-anchor="middle" fill="#7f1d1d" font-family="Inter" font-size="11">rogue action</text>
+      </svg>
+      <figcaption>All three overlapping = a single poisoned page can read private data <b>and</b> send it out. Break any one circle and the blast radius collapses.</figcaption>
+    </figure>
+
+    <h3>Mitigations</h3>
+    <ul class="tight">
+      <li><b>Least privilege</b> — scope per-tenant creds; block high-risk OAuth grants to non-allow-listed domains.</li>
+      <li><b>Allow-lists + caps</b> — restrict navigable domains; limit actions and spend per run.</li>
+      <li><b>Isolation</b> — ephemeral, sandboxed browser sessions; nothing persists between tasks.</li>
+      <li><b>Human-in-the-loop</b> — approval required for anything sensitive or irreversible.</li>
+      <li><b>Injection defenses</b> — use guarded models (Anthropic trains against injections and scans untrusted content with classifiers).</li>
+      <li><b>Treat agent access like admin access</b> — same approvals, same audit logging.</li>
+    </ul>
+    <div class="callout danger"><span class="ic">⚠️</span><div class="body"><span class="t">Reality check</span><p>Even with defenses, Anthropic reports <b>~1% of injection attempts still succeed</b> — meaningful risk at scale. Assume the agent <em>will</em> sometimes be fooled, and design the blast radius so that when it is, the damage is contained.</p></div></div>
+  </section>
+
+  <!-- 09 DECISION -->
+  <section id="decision">
+    <h2 class="sec"><span class="num">08</span>Use it / skip it</h2>
+    <div class="two-col">
+      <div class="panel good">
+        <h4>✓ Good fit</h4>
+        <ul>
+          <li>Repetitive, well-scoped tasks</li>
+          <li>No usable API on the target</li>
+          <li>Supervised, or a human approves key steps</li>
+          <li>Occasional failure is tolerable (retry/HITL)</li>
+          <li>Mainstream sites that don't fight bots</li>
+        </ul>
+      </div>
+      <div class="panel bad">
+        <h4>✕ Skip (for now)</h4>
+        <ul>
+          <li>Unsupervised, high-stakes, irreversible actions</li>
+          <li>Sub-second latency requirements</li>
+          <li>Strict determinism / heavy compliance</li>
+          <li>Hostile anti-bot targets (ToS risk)</li>
+          <li>A clean sanctioned API already exists — use it</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="takeaways">
+    <h2>Takeaways</h2>
+    <ul>
+      <li><span class="tx">A browser agent is an <b>LLM in a perceive → reason → act loop</b> driving a real browser.</span></li>
+      <li><span class="tx">2026 reality: strong for <b>narrow, supervised</b> web tasks; the field went <b>API-first</b>.</span></li>
+      <li><span class="tx">Production stack = <b>framework + managed cloud browser + computer-use model</b>.</span></li>
+      <li><span class="tx"><b>Security is the gating issue</b> — the trifecta; least privilege + HITL + allow-lists are non-negotiable.</span></li>
+      <li><span class="tx">If a sanctioned <b>API exists, use it</b>; reach for agents when there's none and the UI keeps shifting.</span></li>
+    </ul>
+  </div>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><a href="https://www.anthropic.com/research/prompt-injection-defenses">Anthropic — Mitigating prompt injection in browser use</a></li>
+      <li><a href="https://nohacks.co/blog/agentic-browser-landscape-2026">The Agentic Browser Landscape in 2026 (No Hacks)</a></li>
+      <li><a href="https://dev.to/stevengonsalvez/browser-tools-for-ai-agents-part-2-the-framework-wars-browser-use-stagehand-skyvern-4gn">Framework wars: Browser Use vs Stagehand vs Skyvern (dev.to)</a></li>
+      <li><a href="https://github.com/browserbase/stagehand">Stagehand (Browserbase) — GitHub</a></li>
+      <li><a href="https://ai2.work/blog/google-kills-project-mariner-as-the-industry-pivots-to-api-first-agents">Google retires Project Mariner; the pivot to API-first agents</a></li>
+      <li><a href="https://benchmarkingagents.com/agent-benchmarks/">AI agent benchmarks 2026 (WebArena, OSWorld, …)</a></li>
+      <li><a href="https://arxiv.org/pdf/2511.19477">Building Browser Agents: Architecture, Security, and Practical Solutions (arXiv)</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Part of the <a href="../index.html">Learning</a> series · researched &amp; explained to be understood, not memorized.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button'); btn.className = 'copy-btn'; btn.textContent = 'Copy';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(block.querySelector('code').innerText).then(function () {
+        btn.textContent = 'Copied!'; btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1600);
+      });
+    });
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>
