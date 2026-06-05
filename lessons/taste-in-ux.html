@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Taste in UX, Below the Surface — Learning</title>
+<meta name="description" content="What taste in UX actually is — beneath visual polish: the conceptual model, subtraction, honest affordances, friction as a material, opinionated POV, the edges, and what Norman, Rams, Ive, Alexander and Saarinen really think." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.64; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 780px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 870px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 670px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 780px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin: 52px 0 6px; line-height: 1.24; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.05rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.12rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .86em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  blockquote.q { margin: 22px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--violet); border-radius: 0 14px 14px 0; box-shadow: var(--shadow); }
+  blockquote.q p { margin: 0; font-size: 1.06rem; font-style: italic; color: #2b3142; line-height: 1.55; }
+  blockquote.q cite { display: block; margin-top: 8px; font-style: normal; font-weight: 700; font-size: 13px; color: var(--primary-dark); }
+  blockquote.q cite span { color: var(--faint); font-weight: 500; }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .chips span { font-size: 12.5px; font-weight: 600; color: #494b8a; background: #eef0ff; border: 1px solid #ddd9ff; padding: 4px 12px; border-radius: 999px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .panel h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .panel.a h4 { color: #8a93a6; } .panel.b h4 { color: var(--primary-dark); }
+  .panel ul { margin: 0; padding-left: 0; list-style: none; }
+  .panel li { padding-left: 20px; position: relative; margin: 8px 0; font-size: .95rem; color: #2b3142; }
+  .panel.a li::before { content: "○"; position: absolute; left: 0; color: #b8c0d0; }
+  .panel.b li::before { content: "◆"; position: absolute; left: 0; color: var(--primary); font-size: .8em; top: 2px; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 6px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Taste in UX</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🎨 Craft · UX Judgment</span>
+  <h1>Taste in UX, Below the Surface</h1>
+  <p class="lede">Visual polish, whitespace, "clean UI" — you have that. This is the layer underneath: the conceptual model, what to remove, where to place friction, and the opinionated point of view that separates a tool people love from one they merely tolerate.</p>
+  <div class="meta-row">
+    <span>⏱️ ~15 min</span>
+    <span>🪙 Signal, not surface</span>
+    <span>🎙️ Anchored in primary sources</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#surface">The surface is the thin layer</a></li>
+    <li><a href="#model">It operates on the mental model</a></li>
+    <li><a href="#subtract">It's mostly subtraction</a></li>
+    <li><a href="#afford">Affordances must be honest</a></li>
+    <li><a href="#friction">Friction is a material</a></li>
+    <li><a href="#opinion">Opinionated, not consensus</a></li>
+    <li><a href="#edges">Taste lives in the edges</a></li>
+    <li><a href="#felt">It's felt over time</a></li>
+    <li><a href="#context">Match the aesthetic to the job</a></li>
+    <li><a href="#dark">The dark side</a></li>
+    <li><a href="#moat">The moat &amp; how it's earned</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 -->
+  <section id="surface">
+    <h2 class="sec"><span class="num">01</span>The surface is the thin layer</h2>
+    <p class="lead-in">In Jesse James Garrett's model, the visual "surface" is literally the <b>top, thinnest plane</b> of UX. Everything that decides whether a product is good sits below it — strategy, structure, the flows. Taste is overwhelmingly a lower-plane skill.</p>
+    <figure>
+      <svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Garrett's five planes of UX, surface on top">
+        <g font-family="Inter">
+          <rect x="150" y="36" width="340" height="40" rx="8" fill="#f3f4ff" stroke="#d9d6f5" stroke-width="1.5"/>
+          <text x="320" y="56" text-anchor="middle" font-size="13.5" font-weight="700" fill="#6b6aa8">Surface</text>
+          <text x="320" y="71" text-anchor="middle" font-size="10.5" fill="#8a93a6">visual / sensory design</text>
+          <rect x="150" y="84" width="340" height="46" rx="8" fill="#e9ecff" stroke="#cdd0f5" stroke-width="1.5"/>
+          <text x="320" y="105" text-anchor="middle" font-size="13.5" font-weight="700" fill="#5b51e8">Skeleton</text>
+          <text x="320" y="121" text-anchor="middle" font-size="10.5" fill="#5b6478">layout · interface · navigation</text>
+          <rect x="150" y="138" width="340" height="52" rx="8" fill="#dfe3ff" stroke="#c2c6f0" stroke-width="1.5"/>
+          <text x="320" y="160" text-anchor="middle" font-size="13.5" font-weight="700" fill="#4338ca">Structure</text>
+          <text x="320" y="177" text-anchor="middle" font-size="10.5" fill="#5b6478">interaction design · information architecture</text>
+          <rect x="150" y="198" width="340" height="56" rx="8" fill="#d3d8fb" stroke="#b3b8ec" stroke-width="1.5"/>
+          <text x="320" y="221" text-anchor="middle" font-size="13.5" font-weight="700" fill="#3a32b0">Scope</text>
+          <text x="320" y="239" text-anchor="middle" font-size="10.5" fill="#494b8a">features · content — what exists at all</text>
+          <rect x="150" y="262" width="340" height="62" rx="8" fill="#4338ca"/>
+          <text x="320" y="287" text-anchor="middle" font-size="13.5" font-weight="800" fill="#fff">Strategy</text>
+          <text x="320" y="306" text-anchor="middle" font-size="10.5" fill="#cbd0ff">user needs · product intent — the real problem</text>
+        </g>
+        <path d="M506,36 L520,36 L520,76 L506,76" fill="none" stroke="#8a93a6" stroke-width="2"/>
+        <text x="540" y="60" font-family="Inter" font-size="11" font-weight="600" fill="#8a93a6">what you<tspan x="540" dy="14">screenshot</tspan></text>
+        <path d="M506,138 L520,138 L520,324 L506,324" fill="none" stroke="#4338ca" stroke-width="2"/>
+        <text x="540" y="228" font-family="Inter" font-size="11" font-weight="700" fill="#4338ca">where taste<tspan x="540" dy="14">decides</tspan></text>
+      </svg>
+      <figcaption>Garrett's five planes. The surface is real and matters — but it's the consequence of good lower-plane decisions, not a substitute for them.</figcaption>
+    </figure>
+    <blockquote class="q"><p>"The hard part of design is rarely generating the form. It is understanding the problem well enough to know what and how something should exist at all."</p><cite>Karri Saarinen <span>— founder &amp; CEO, Linear</span></cite></blockquote>
+  </section>
+
+  <!-- 02 -->
+  <section id="model">
+    <h2 class="sec"><span class="num">02</span>It operates on the mental model, not the pixels</h2>
+    <p>The UX equivalent of "pick the right data structure" is <b>design the right conceptual model.</b> Don Norman's frame: the user acts across a <em>gulf of execution</em> ("how do I do this?") and interprets results across a <em>gulf of evaluation</em> ("what just happened?"). The only bridge is the <b>system image</b> — what the interface communicates. Bad UX is almost always a <b>model mismatch</b>, not ugly pixels.</p>
+    <figure>
+      <svg viewBox="0 0 680 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Norman's gulfs of execution and evaluation">
+        <defs>
+          <marker id="ae" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2f7df6"/></marker>
+          <marker id="av" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#10b981"/></marker>
+        </defs>
+        <rect x="30" y="86" width="150" height="58" rx="12" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="105" y="110" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#4338ca">User's model</text>
+        <text x="105" y="128" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">goals &amp; expectations</text>
+        <rect x="265" y="80" width="150" height="70" rx="12" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="2"/>
+        <text x="340" y="104" text-anchor="middle" font-family="Inter" font-size="13" font-weight="800" fill="#6d28d9">System image</text>
+        <text x="340" y="121" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">the UI — the only</text>
+        <text x="340" y="135" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">thing you actually make</text>
+        <rect x="500" y="86" width="150" height="58" rx="12" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="575" y="110" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#4338ca">System model</text>
+        <text x="575" y="128" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">how it really works</text>
+        <path d="M180,100 C220,76 250,76 265,92" fill="none" stroke="#2f7df6" stroke-width="2.5" marker-end="url(#ae)"/>
+        <text x="222" y="64" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#1d4ed8">Gulf of Execution</text>
+        <text x="222" y="78" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b6478">"how do I do this?"</text>
+        <path d="M500,130 C460,156 420,156 415,140" fill="none" stroke="#10b981" stroke-width="2.5" marker-end="url(#av)"/>
+        <text x="458" y="178" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#047857">Gulf of Evaluation</text>
+        <text x="458" y="192" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b6478">"what just happened?"</text>
+      </svg>
+      <figcaption>You never design the user's mind or the system directly — only the <b>system image</b> between them. Taste is shaping it so both gulfs nearly vanish.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 03 -->
+  <section id="subtract">
+    <h2 class="sec"><span class="num">03</span>It's mostly subtraction</h2>
+    <p>The least visible, hardest taste is <b>removal</b> — of choices, steps, screens, and features. Every element added taxes every future user. The greats are unanimous here:</p>
+    <blockquote class="q"><p>"Good design is as little design as possible. Less, but better — because it concentrates on the essential aspects."</p><cite>Dieter Rams <span>— Ten Principles of Good Design</span></cite></blockquote>
+    <p>Jobs: <em>"deciding what not to do is as important as deciding what to do."</em> Krug: <em>"don't make me think."</em> Golden Krishna pushes it furthest — <em>"the best interface is no interface"</em>: sometimes the tasteful answer is to remove the screen entirely and just solve the problem. Subtraction is unglamorous, un-screenshot-able, and the highest-leverage move you have.</p>
+  </section>
+
+  <!-- 04 -->
+  <section id="afford">
+    <h2 class="sec"><span class="num">04</span>Affordances must be honest</h2>
+    <p>A good interface tells you how to use it without a manual — Norman's <b>affordances</b> (what's possible) and <b>signifiers</b> (what's communicated). Taste here has two halves:</p>
+    <ul class="tight">
+      <li><b>Make the right action obvious.</b> The primary path should be the path of least resistance; the dangerous path should take effort.</li>
+      <li><b>Never lie.</b> The system image must match the system's real state — no fake progress bars, no disabled buttons with no reason, no "Saved!" before it saved. Trust is built by the UI and the system always agreeing.</li>
+    </ul>
+    <p>This is why a chat box alone is often poor taste: a blank text field affords <em>nothing</em> — it hides what the tool can do. Good tools wear their capabilities on their surface.</p>
+  </section>
+
+  <!-- 05 -->
+  <section id="friction">
+    <h2 class="sec"><span class="num">05</span>Friction is a material, not the enemy</h2>
+    <p>Naive taste says "remove all friction, make it seamless." Mature taste treats friction as a <b>material you place deliberately.</b> Frictionless is wrong when the moment deserves weight:</p>
+    <ul class="tight">
+      <li><b>Safety &amp; reversibility</b> — confirmation on destructive actions; undo over "are you sure" where possible.</li>
+      <li><b>Trust</b> — the "labor illusion": showing the work (a check running, results being gathered) can make an instant result feel more trustworthy, not less.</li>
+      <li><b>Reflection</b> — a deliberate speed bump before an irreversible or high-stakes commit.</li>
+    </ul>
+    <p>The taste is <b>friction where it matters, none where it doesn't</b> — a gradient, not a global "make everything fast."</p>
+  </section>
+
+  <!-- 06 -->
+  <section id="opinion">
+    <h2 class="sec"><span class="num">06</span>It's opinionated, not consensus</h2>
+    <p>Great UX has a coherent point of view — the experience equivalent of conceptual integrity. It comes from <b>synthesizing the latent need</b>, not averaging stated preferences. Users can rarely name what they want; taste is seeing it before they can.</p>
+    <p>This is why <b>A/B tests can't produce taste</b>: they climb the nearest local hill. They'll never discover the redesign that requires going downhill first. Linear's whole thesis is craft and conviction over metric-chasing — and it became the most-loved tool in its category by ignoring the consensus playbook.</p>
+    <p>UX taste, like software taste, is a coherent ranking of values in tension — and great products choose, visibly:</p>
+    <div class="chips">
+      <span>density ⇄ simplicity</span><span>speed ⇄ guidance</span><span>power ⇄ approachability</span><span>consistency ⇄ appropriateness</span><span>delight ⇄ restraint</span><span>flexibility ⇄ opinion</span><span>novelty ⇄ familiarity</span>
+    </div>
+    <p>Blind consistency and reflexive "best practices" are the tell of <em>no</em> taste — knowing when to break a convention (and when muscle memory means you must not) is the skill.</p>
+  </section>
+
+  <!-- 07 -->
+  <section id="edges">
+    <h2 class="sec"><span class="num">07</span>Taste lives in the edges</h2>
+    <p>Amateurs perfect the happy path — the demo, the hero shot. Taste shows in the states nobody screenshots, because that's where real use actually happens.</p>
+    <div class="two-col">
+      <div class="panel a"><h4>Where amateurs stop</h4>
+        <ul><li>the happy path</li><li>the marketing screenshots</li><li>the hero animation</li><li>the settings nobody opens</li></ul>
+      </div>
+      <div class="panel b"><h4>Where taste sweats</h4>
+        <ul><li>empty states &amp; the first 5 minutes</li><li>error messages &amp; failure handling</li><li>loading, latency &amp; perceived speed</li><li>sensible <b>defaults</b> (the highest-leverage decision)</li></ul>
+      </div>
+    </div>
+    <p>Defaults deserve special weight: the option you pre-pick is the one most users will live with forever. A tasteful default is a quiet, enormous act of design.</p>
+  </section>
+
+  <!-- 08 -->
+  <section id="felt">
+    <h2 class="sec"><span class="num">08</span>It's felt over time, not seen in a frame</h2>
+    <p>UX taste isn't a screenshot; it's the <b>derivative</b> — how the thing feels to use, repeatedly, over weeks. Tempo, responsiveness, the physics of motion, the weight of a tap. That's why the deepest taste refuses to separate design from engineering:</p>
+    <blockquote class="q"><p>"Most people make the mistake of thinking design is what it looks like… Design is how it works."</p><cite>Steve Jobs <span>— on Jony Ive's work</span></cite></blockquote>
+    <p>Motion is the clearest tell: tasteful motion <b>explains</b> (where did this come from, where did it go — preserving the user's sense of place); tasteless motion <b>decorates</b>. And the oldest name for the felt quality comes from architect Christopher Alexander — the <b>"quality without a name"</b>: the hard-to-articulate sense that something is alive, whole, <em>right</em>. You feel it before you can justify it, and chasing that felt rightness is the work.</p>
+  </section>
+
+  <!-- 09 -->
+  <section id="context">
+    <h2 class="sec"><span class="num">09</span>Match the aesthetic to the job</h2>
+    <p>There is no universal "good UX," just as there's no single good taste in code. The aesthetic must fit the <b>job to be done</b> (Christensen) and the user:</p>
+    <ul class="tight">
+      <li><b>Pro tools want density.</b> Edward Tufte's lesson — maximize information per glance. Bloomberg, vim, Linear, a trading terminal: "clean and minimal" would <em>cripple</em> them. Dense-done-well is high taste.</li>
+      <li><b>Consumer &amp; first-run want simplicity</b> — fewer choices, gentle slope.</li>
+      <li><b>Regulated &amp; high-stakes want legibility &amp; honesty</b> over delight — show state, confirm, leave a trail.</li>
+    </ul>
+    <p>The "minimalism everywhere" cargo cult is itself a failure of taste. Reading which aesthetic the situation demands <em>is</em> the taste.</p>
+  </section>
+
+  <!-- 10 -->
+  <section id="dark">
+    <h2 class="sec"><span class="num">10</span>The dark side</h2>
+    <p>Taste serves the user's goal — the moment it serves a metric or the designer's portfolio, it inverts into its opposite:</p>
+    <ul class="tight">
+      <li><b>Engagement-maxxing &amp; dark patterns</b> — friction added to <em>trap</em> (hard-to-cancel, confirm-shaming) is anti-taste wearing a polished coat.</li>
+      <li><b>Delight as garnish</b> — animation and "joy" piled on a confused flow. Fix the model first; delight is the reward for a solved problem, not a cover for an unsolved one.</li>
+      <li><b>Beauty over honesty</b> — a gorgeous UI that misrepresents what the system is doing is worse than a plain one that tells the truth.</li>
+    </ul>
+    <div class="callout warn"><span class="ic">⚠️</span><div class="body"><span class="t">The test</span><p>Whose goal does this serve — the user's, or the dashboard's? Restraint in service of the user is the higher taste.</p></div></div>
+  </section>
+
+  <!-- 11 -->
+  <section id="moat">
+    <h2 class="sec"><span class="num">11</span>The moat — and how it's earned</h2>
+    <p>As AI generates interfaces on demand, the baseline is generic, plausible "UI slop." So judgment — knowing what to build, what feels right, what to cut — becomes the differentiator. This is why a <b>craft renaissance</b> is happening at exactly the moment generation got cheap (Linear, Vercel, Raycast, Arc): taste is the part the model can imitate but can't <em>own</em>, because it's grounded in a point of view.</p>
+    <p>And it's earned, not downloaded:</p>
+    <ul class="tight">
+      <li><b>Exposure</b> — study the greats (Rams, Tufte, Alexander) and live in great products until the bar resets.</li>
+      <li><b>Dogfood in real context</b> — distracted, mobile, tired, first-time. The demo lies; real use tells the truth.</li>
+      <li><b>Critique culture</b> — Apple's design reviews, Pixar's "Braintrust": taste is transmitted through honest, frequent critique, not style guides.</li>
+      <li><b>Own the outcome</b> — feel the consequence of your choices on real users. Taste calibrates on feedback, not opinion.</li>
+    </ul>
+  </section>
+
+  <div class="takeaways">
+    <h2>What you might not have had crisply</h2>
+    <ul>
+      <li><span class="tx">The visual <b>surface is the thinnest plane</b> — taste decides on strategy &amp; structure (Garrett, Saarinen).</span></li>
+      <li><span class="tx">UX taste operates on the <b>conceptual model</b> — closing Norman's two gulfs via the system image.</span></li>
+      <li><span class="tx"><b>Subtraction</b> and <b>defaults</b> are the highest-leverage, least-visible taste.</span></li>
+      <li><span class="tx"><b>Friction is a material</b> — placed where it matters; "seamless everywhere" is naive.</span></li>
+      <li><span class="tx">Great UX is <b>opinionated</b> (A/B tests can't find it) and <b>contextual</b> (density vs simplicity by job).</span></li>
+      <li><span class="tx">It's <b>felt over time</b> (Alexander's quality-without-a-name; Ive's "how it works") — and now the <b>moat</b>, when UI is cheap to generate.</span></li>
+    </ul>
+  </div>
+
+  <p style="text-align:center;margin-top:34px;color:var(--muted)">Sibling lesson: <a href="taste-in-software.html" style="color:var(--primary-dark);font-weight:600">Taste in Software, Below the Waterline</a> — the same shape, one layer down the stack.</p>
+
+  <div class="sources" id="sources">
+    <h3>Primary sources — go to the originals</h3>
+    <ul>
+      <li><b>The canon:</b> Don Norman — <em>The Design of Everyday Things</em> (gulfs, affordances, system image) · <a href="https://www.vitsoe.com/us/about/good-design">Dieter Rams — Ten Principles of Good Design</a> · Jesse James Garrett — <em>The Elements of User Experience</em> (the five planes)</li>
+      <li><b>The deep cut:</b> Christopher Alexander — <em>The Timeless Way of Building</em> (the quality without a name) · <a href="https://www.nngroup.com/articles/don-norman-text-only-ui/">Norman on why pure-text UIs fail</a></li>
+      <li><b>Craft &amp; conviction:</b> <a href="https://www.lennysnewsletter.com/p/inside-linear-building-with-taste">Karri Saarinen (Linear) — building with taste, craft &amp; focus</a> · <a href="https://www.edwardtufte.com/tufte/">Edward Tufte — information density done right</a></li>
+      <li><b>Principle &amp; restraint:</b> Bret Victor — <em>Inventing on Principle</em> · Golden Krishna — <em>The Best Interface Is No Interface</em> · Steve Krug — <em>Don't Make Me Think</em></li>
+      <li><b>The AI-era turn:</b> <a href="https://stateofaidesign.com/chapters/craft">State of AI in Design 2026 — the craft chapter</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  All the content on this page is AI generated.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+</script>
+</body>
+</html>
