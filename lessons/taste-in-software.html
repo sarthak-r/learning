@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Taste in Software, Below the Waterline — Learning</title>
+<meta name="description" content="What taste in software actually is — beneath the surface definitions — and what top-tier engineers (Torvalds, Graham, Cantrill, Naur, Hickey, Metz, Muratori) really think about it." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.64; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 780px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 870px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 670px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 780px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin: 52px 0 6px; line-height: 1.24; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.05rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.12rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .86em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  /* expert pull-quote */
+  blockquote.q { margin: 22px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--violet); border-radius: 0 14px 14px 0; box-shadow: var(--shadow); }
+  blockquote.q p { margin: 0; font-size: 1.06rem; font-style: italic; color: #2b3142; line-height: 1.55; }
+  blockquote.q cite { display: block; margin-top: 8px; font-style: normal; font-weight: 700; font-size: 13px; color: var(--primary-dark); }
+  blockquote.q cite span { color: var(--faint); font-weight: 500; }
+
+  /* code */
+  .code-block { position: relative; margin: 16px 0; }
+  .code-block .cap { font-size: 12px; font-weight: 600; color: var(--faint); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 12.5px; line-height: 1.6; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .c { color: #7e89a8; } .code-block .kw { color: #c4b5fd; } .code-block .hl { background: rgba(239,68,68,.18); color: #ffc2b8; border-radius: 3px; }
+  .codepair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  @media (max-width: 680px) { .codepair { grid-template-columns: 1fr; } }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .chips span { font-size: 12.5px; font-weight: 600; color: #494b8a; background: #eef0ff; border: 1px solid #ddd9ff; padding: 4px 11px; border-radius: 999px; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 6px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Taste in Software</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🧭 Craft · Judgment</span>
+  <h1>Taste in Software, Below the Waterline</h1>
+  <p class="lede">The surface answer — clean code, good names, nice formatting — you already have. This is the part underneath: what taste actually operates on, why there isn't one "good taste," and what the people who unmistakably have it think it is.</p>
+  <div class="meta-row">
+    <span>⏱️ ~15 min</span>
+    <span>🪙 Signal, not surface</span>
+    <span>🎙️ Anchored in primary sources</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#surface">Drop the surface definition</a></li>
+    <li><a href="#real">Taste is real, not opinion</a></li>
+    <li><a href="#operates">What it operates on: representation</a></li>
+    <li><a href="#values">A coherent ranking of values</a></li>
+    <li><a href="#theory">The deepest layer: theory-building</a></li>
+    <li><a href="#context">Dogma is the tell of no taste</a></li>
+    <li><a href="#felt">It's felt before it's argued</a></li>
+    <li><a href="#dark">The dark side</a></li>
+    <li><a href="#now">Why it's the moat now</a></li>
+    <li><a href="#acquire">How the great ones get it</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 -->
+  <section id="surface">
+    <h2 class="sec"><span class="num">01</span>Drop the surface definition</h2>
+    <p class="lead-in">Formatting, naming, "clean code," picking the trendy framework — that's the visible tip. Taste is mostly the 90% below the waterline: <b>judgment about what's worth building, which representation makes the problem dissolve, and what to leave out.</b> It's compressed, fast, values-driven discrimination — not a style guide.</p>
+    <figure>
+      <svg viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The taste iceberg: surface vs deep">
+        <rect x="0" y="168" width="640" height="252" fill="#dbeafe" fill-opacity="0.45"/>
+        <!-- iceberg -->
+        <polygon points="300,52 352,52 372,168 268,168" fill="#fbfdff" stroke="#cdd7e6" stroke-width="1.5"/>
+        <polygon points="248,168 404,168 452,300 380,392 250,392 178,300" fill="#eef4ff" stroke="#c2d2ea" stroke-width="1.5"/>
+        <line x1="0" y1="168" x2="640" y2="168" stroke="#60a5fa" stroke-width="2" stroke-dasharray="7 5"/>
+        <text x="632" y="162" text-anchor="end" font-family="Inter" font-size="11.5" font-style="italic" fill="#2563eb">the surface — what you already know</text>
+        <!-- above labels -->
+        <text x="120" y="92" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#8a93a6" letter-spacing="0.04em">WHAT GETS CALLED TASTE</text>
+        <g font-family="Inter" font-size="12.5" fill="#5b6478">
+          <text x="120" y="118" text-anchor="middle">formatting · naming</text>
+          <text x="120" y="138" text-anchor="middle">"clean code"</text>
+          <text x="520" y="118" text-anchor="middle">design patterns</text>
+          <text x="520" y="138" text-anchor="middle">framework picks</text>
+        </g>
+        <!-- below labels -->
+        <text x="320" y="200" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#1d4ed8" letter-spacing="0.04em">WHAT TASTE ACTUALLY IS</text>
+        <g font-family="Inter" font-size="13" font-weight="600" fill="#1f2433">
+          <text x="320" y="228" text-anchor="middle">the representation you choose</text>
+          <text x="320" y="256" text-anchor="middle">what you leave out</text>
+          <text x="320" y="284" text-anchor="middle">conceptual integrity · value ranking</text>
+          <text x="320" y="312" text-anchor="middle">the theory of the domain</text>
+          <text x="320" y="340" text-anchor="middle">reading the context</text>
+        </g>
+      </svg>
+      <figcaption>Everything visible in a diff sits above the line. Taste is decided below it — before a line is written.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 02 -->
+  <section id="real">
+    <h2 class="sec"><span class="num">02</span>Taste is real, not opinion</h2>
+    <p>The first non-obvious claim, and Paul Graham's whole argument in <a class="callout-link" href="https://paulgraham.com/taste.html" style="color:var(--primary-dark);font-weight:600">"Taste for Makers"</a>: good design is <b>not</b> merely subjective. There are properties that recur across great work — it's simple, it solves the <em>right</em> problem, it looks easy but is hard, it's timeless, and it's often a little daring. Taste is a <b>learned classifier</b> built from thousands of examples, not a vibe.</p>
+    <p>The practical edge: this lets you separate <b>taste</b> (durable, convergent) from <b>fashion</b> (mimicry — microservices everywhere, the quarterly rewrite, every new framework). Good taste is conspicuously <em>unfashionable</em>: it ages well.</p>
+  </section>
+
+  <!-- 03 -->
+  <section id="operates">
+    <h2 class="sec"><span class="num">03</span>What it operates on: representation, not style</h2>
+    <p>The deepest code-level taste isn't tidiness — it's choosing the <b>representation that makes complexity disappear.</b> Torvalds' famous example: removing a node from a singly linked list. The naive version needs a special case for the head; the tasteful version makes that special case <em>vanish</em>.</p>
+    <div class="codepair">
+      <div class="code-block">
+        <p class="cap">before — a special case for the head</p>
+        <pre><code><span class="kw">void</span> remove(List *l, Item *t) {
+  Item *c = l-&gt;head, *p = <span class="kw">NULL</span>;
+  <span class="kw">while</span> (c != t) { p = c; c = c-&gt;next; }
+<span class="hl">  if (p) p-&gt;next = c-&gt;next;       // middle</span>
+<span class="hl">  else   l-&gt;head = c-&gt;next;       // head</span>
+}</code></pre>
+      </div>
+      <div class="code-block">
+        <p class="cap">after — the special case is gone</p>
+        <pre><code><span class="kw">void</span> remove(List *l, Item *t) {
+  Item **p = &amp;l-&gt;head;   <span class="c">// pointer-to-pointer</span>
+  <span class="kw">while</span> (*p != t)
+    p = &amp;(*p)-&gt;next;
+  *p = t-&gt;next;          <span class="c">// one path. done.</span>
+}</code></pre>
+      </div>
+    </div>
+    <blockquote class="q"><p>"…rewrite it so that the special case goes away and becomes the normal case. And that's good code."</p><cite>Linus Torvalds <span>— TED, on good taste</span></cite></blockquote>
+    <p>Fred Brooks said the same from the other end: <em>"Show me your flowcharts and conceal your tables, and I shall continue to be mystified. Show me your tables, and I won't usually need your flowcharts."</em> Taste lives in the <b>data model</b>; pick it well and the logic becomes obvious. Most "complex" code is a bad representation wearing cleverness as a disguise.</p>
+  </section>
+
+  <!-- 04 -->
+  <section id="values">
+    <h2 class="sec"><span class="num">04</span>There is no single "good taste" — only a coherent ranking of values</h2>
+    <p>Bryan Cantrill's <a href="https://www.youtube.com/watch?v=2wZ1pCpJUIM" style="color:var(--primary-dark);font-weight:600">"Software as a Reflection of Values"</a> is the insight most people miss. Every system embodies values — and it <b>cannot maximize all of them.</b> Taste is which ones win <em>when they collide:</em></p>
+    <div class="chips">
+      <span>simplicity</span><span>performance</span><span>robustness</span><span>approachability</span><span>velocity</span><span>portability</span><span>debuggability</span><span>expressiveness</span><span>safety</span><span>stability</span><span>integrity</span><span>composability</span>
+    </div>
+    <p>SQLite optimizes integrity and stability; Node optimizes approachability and velocity; the Linux kernel optimizes performance and backward-compatibility. All are <b>tasteful</b> — and they'd each call the others' trade-offs wrong. Mature taste isn't a universal scale; it's a <b>prioritized, internally-consistent value system, matched to the job.</b> Brooks' term for applying it uniformly across a whole system is <b>conceptual integrity</b> — and he argued it's "the most important consideration in system design."</p>
+    <blockquote class="q"><p>"…it's not just about selecting the right tool for the job. It's about selecting the right <em>values</em> for the job — and then the right software for those values."</p><cite>Bryan Cantrill</cite></blockquote>
+  </section>
+
+  <!-- 05 -->
+  <section id="theory">
+    <h2 class="sec"><span class="num">05</span>The deepest layer: taste is theory-building</h2>
+    <p>Peter Naur's 1985 <a href="https://pages.cs.wisc.edu/~remzi/Naur.pdf" style="color:var(--primary-dark);font-weight:600">"Programming as Theory Building"</a> is the most underread idea in software. His claim: a program is the externalization of a <b>theory</b> the builders hold in their heads — of the domain, and of why the code is shaped the way it is. The source is only a shadow of that theory.</p>
+    <p>The consequences are the signal. <b>Rot is theory loss, not messy syntax.</b> Code can be immaculately formatted and <em>dead</em> (the team that held the theory left; no one can safely change it), or scruffy and <em>alive</em> (the theory is intact, so changes are easy and correct). Taste, at its deepest, is <b>building and preserving a coherent theory</b> — and recognizing that documentation, tests, and tidy code are aids to it, never replacements for it.</p>
+    <div class="callout key"><span class="ic">🧠</span><div class="body"><span class="t">The reframe</span><p>"Maintainable" doesn't mean clean. It means the next person can reconstruct the theory. Tasteful code is <b>legible to the model in someone else's head.</b></p></div></div>
+  </section>
+
+  <!-- 06 -->
+  <section id="context">
+    <h2 class="sec"><span class="num">06</span>Mature taste is contextual — dogma is the tell of <em>no</em> taste</h2>
+    <p>The counterintuitive part: the tasteful engineer often does the "uglier" thing on purpose, because rules applied without judgment are the opposite of taste.</p>
+    <ul class="tight">
+      <li><b>"Clean code" can be bad taste.</b> Casey Muratori showed the standard clean-code rules (polymorphism over <code>switch</code>, etc.) running <b>~15× slower</b>. In a hot loop, the tasteful choice is the "dirty" one.</li>
+      <li><b>Abstraction is a timing decision.</b> Sandi Metz: <em>"duplication is far cheaper than the wrong abstraction."</em> Premature DRY is a classic tell — taste is knowing <em>when</em> to abstract (often: not yet).</li>
+      <li><b>Simple ≠ easy.</b> Rich Hickey: <em>simple</em> is objective (un-braided, one concern) and often <em>harder</em>; <em>easy</em> is just familiar. Reaching for easy over simple is the most common taste failure.</li>
+    </ul>
+    <p>Cargo-culted patterns, "best practices" recited without their trade-offs, purity for its own sake — these <em>look</em> like taste and are its absence. Real taste is contextual judgment, which is why it can't be a checklist.</p>
+  </section>
+
+  <!-- 07 -->
+  <section id="felt">
+    <h2 class="sec"><span class="num">07</span>It's felt before it's argued</h2>
+    <p>Ask a top engineer why a design is wrong and you'll often get "I can't articulate it yet, but this is wrong" — followed, a day later, by the precise reason. That's not hand-waving. Taste is a <b>fast, somatic classifier</b> (a System-1 response trained on enormous data); the felt revulsion <em>precedes</em> the explanation. The discipline that separates taste from mere bias is the second step: <b>interrogate the gut, make the reason explicit, and be willing to override it</b> when the context says so.</p>
+  </section>
+
+  <!-- 08 -->
+  <section id="dark">
+    <h2 class="sec"><span class="num">08</span>The dark side</h2>
+    <p>Taste without restraint is a liability. The most expensive mistakes in our field are <b>tasteful</b>: the elegant rewrite that kills the product (Joel Spolsky's "<a href="https://www.joelonsoftware.com/2000/04/06/things-you-should-never-do-part-i/" style="color:var(--primary-dark);font-weight:600">things you should never do</a>"), the abstraction nobody needed, the year spent polishing what should have shipped rough.</p>
+    <div class="callout warn"><span class="ic">⚠️</span><div class="body"><span class="t">Taste serves the outcome, not the ego</span><p>Knowing when <em>not</em> to indulge your taste — shipping the good-enough thing, tolerating the ugly seam — is itself the higher taste. Aesthetics in service of the user; never the reverse.</p></div></div>
+  </section>
+
+  <!-- 09 -->
+  <section id="now">
+    <h2 class="sec"><span class="num">09</span>Why it's suddenly the moat</h2>
+    <p>When generating code was expensive, raw ability was the bottleneck. In 2026 it isn't — agents generate more than anyone can review. So the scarce skill flips from <b>generation to discrimination.</b></p>
+    <blockquote class="q"><p>"When execution is no longer scarce, judgment is. The differentiator is no longer the ability to generate ideas, but the ability to discriminate between them."</p><cite>The 2026 consensus <span>— "code is cheap, judgment is scarce"</span></cite></blockquote>
+    <p>The engineer who can glance at AI output and instantly feel <em>what's subtly wrong, what's fragile, what breaks under load, what confuses a user in six months</em> — that's taste, and it's now the differentiator between people and between companies. Taste is the one thing the model can imitate but not <em>own</em>, because it's grounded in your values and your context.</p>
+  </section>
+
+  <!-- 10 -->
+  <section id="acquire">
+    <h2 class="sec"><span class="num">10</span>How the great ones get it</h2>
+    <p>Taste is caught, not taught — there's no rulebook, only these:</p>
+    <ul class="tight">
+      <li><b>Exposure to the best.</b> Jobs: taste is "trying to expose yourself to the best things humans have done, and then bring those things into what you're doing." Read great codebases the way writers read great books.</li>
+      <li><b>Reps with tight feedback.</b> Build, ship, watch it break, feel the consequence. Taste is calibrated by <em>owning</em> outcomes, not by reading about them.</li>
+      <li><b>Apprenticeship.</b> Code review is the main channel taste travels through — sit near someone who has it.</li>
+      <li><b>Constraints.</b> Limited memory, time, or scope force the omissions that grow taste. Abundance breeds bloat.</li>
+    </ul>
+    <p>Rick Rubin, from outside our field, says it cleanest: the only thing you ultimately have to offer is your point of view — <b>the work is mostly discernment.</b> That's true of a record and a kernel alike.</p>
+  </section>
+
+  <div class="takeaways">
+    <h2>What you might not have had crisply</h2>
+    <ul>
+      <li><span class="tx">Taste operates <b>below the waterline</b> — on representation and omission, not formatting.</span></li>
+      <li><span class="tx">There is <b>no single good taste</b> — only a coherent ranking of competing values, matched to context (Cantrill; Brooks' conceptual integrity).</span></li>
+      <li><span class="tx">The deepest layer is <b>theory-building</b> (Naur): rot is theory loss; clean code can be dead, messy code alive.</span></li>
+      <li><span class="tx"><b>Dogma is the tell of no taste.</b> "Clean code," DRY, and purity are contextual — the tasteful move is often the ugly one.</span></li>
+      <li><span class="tx">Taste is <b>felt first</b>, then interrogated — and its dark side is the beautiful thing that shouldn't have been built.</span></li>
+      <li><span class="tx">When code is free, taste is the <b>moat</b>: discrimination beats generation.</span></li>
+    </ul>
+  </div>
+
+  <div class="sources" id="sources">
+    <h3>Primary sources — go to the originals</h3>
+    <ul>
+      <li><b>The canon:</b> <a href="https://paulgraham.com/taste.html">Paul Graham — Taste for Makers</a> · <a href="https://www.ted.com/talks/linus_torvalds_the_mind_behind_linux">Torvalds — TED (good taste)</a> + <a href="https://github.com/mkirchner/linked-list-good-taste">the linked-list example, explained</a></li>
+      <li><b>Values &amp; integrity:</b> <a href="https://www.youtube.com/watch?v=2wZ1pCpJUIM">Bryan Cantrill — Software as a Reflection of Values</a> · Fred Brooks — <em>The Mythical Man-Month</em> (conceptual integrity)</li>
+      <li><b>The deep cut:</b> <a href="https://pages.cs.wisc.edu/~remzi/Naur.pdf">Peter Naur — Programming as Theory Building (1985)</a></li>
+      <li><b>Contextual taste:</b> <a href="https://www.infoq.com/presentations/Simple-Made-Easy/">Rich Hickey — Simple Made Easy</a> · <a href="https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction">Sandi Metz — The Wrong Abstraction</a> · <a href="https://www.computerenhance.com/p/clean-code-horrible-performance">Casey Muratori — Clean Code, Horrible Performance</a></li>
+      <li><b>The AI-era turn:</b> <a href="https://towardsdatascience.com/code-is-cheap-engineering-judgement-is-now-the-scarce-resource/">Code is cheap, judgment is scarce</a> · <a href="https://www.designative.info/2026/02/01/taste-is-the-new-bottleneck-design-strategy-and-judgment-in-the-age-of-agents-and-vibe-coding/">Taste is the new bottleneck</a></li>
+      <li><b>Cross-domain:</b> Rick Rubin — <em>The Creative Act</em> (taste as discernment)</li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  All the content on this page is AI generated.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+</script>
+</body>
+</html>
