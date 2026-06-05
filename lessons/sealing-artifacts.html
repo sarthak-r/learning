@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sealing a Filled Artifact: Snapshots &amp; Audit Logs — Learning</title>
+<meta name="description" content="When a client submits a generated form on your portal, how do you freeze it into an immutable, provable record and a tamper-evident audit trail? The exact mechanics, concisely." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 780px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 860px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 660px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 780px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 54px 0 6px; line-height: 1.22; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 24px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.12rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .88em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .code-block { position: relative; margin: 18px 0; }
+  .code-block .cap { font-size: 12px; font-weight: 600; color: var(--faint); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1.62; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .c { color: #7e89a8; }
+  .code-block .k { color: #79b8ff; }
+  .code-block .s { color: #9fd0a0; }
+  .code-block .n { color: #f6c177; }
+  .copy-btn { position: absolute; top: 30px; right: 10px; background: rgba(255,255,255,.08); color: #cdd3e6; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s ease; opacity: 0; }
+  .code-block:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+  .copy-btn.copied { background: var(--green); color: #fff; border-color: var(--green); }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; }
+  .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout.tip { background: var(--tip-soft); border-color: #c7f0dd; } .callout.tip .t { color: #047857; }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.danger { background: var(--danger-soft); border-color: #fbd2d2; } .callout.danger .t { color: #b91c1c; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14.5px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 12px 15px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+  table.t .mono { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--primary-dark); }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 5px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Sealing a Filled Artifact</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🔒 System of Record</span>
+  <h1>Sealing a Filled Artifact</h1>
+  <p class="lede">A generated form is ephemeral. The instant your client submits, you must freeze <em>what they sent</em> into an immutable record and prove <em>who did what, when</em>. Here's exactly what to capture — and how to make it tamper-evident.</p>
+  <div class="meta-row">
+    <span>⏱️ ~8 min</span>
+    <span>🛠️ Mechanics, concise</span>
+    <span>🔎 Researched June 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#two">Two jobs: snapshot vs audit log</a></li>
+    <li><a href="#capture">What a snapshot must capture</a></li>
+    <li><a href="#immutable">Make it tamper-evident</a></li>
+    <li><a href="#audit">The audit log, hash-chained</a></li>
+    <li><a href="#where">Seal server-side, on submit</a></li>
+    <li><a href="#updates">Updates = new versions</a></li>
+    <li><a href="#model">Data model at a glance</a></li>
+    <li><a href="#pitfalls">Pitfalls</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 TWO JOBS -->
+  <section id="two">
+    <h2 class="sec"><span class="num">01</span>Two jobs — don't conflate them</h2>
+    <p class="lead-in">A "snapshot" and an "audit log" solve different problems. You need both, in separate stores.</p>
+    <table class="t">
+      <thead><tr><th></th><th>Snapshot</th><th>Audit log</th></tr></thead>
+      <tbody>
+        <tr><td>Captures</td><td><b>State</b> — what was submitted</td><td><b>Events</b> — what happened around it</td></tr>
+        <tr><td>Shape</td><td>One immutable record (per version)</td><td>Append-only stream of entries</td></tr>
+        <tr><td>Answers</td><td>"What <em>is</em> the record?"</td><td>"How did it come to be? Was it tampered with?"</td></tr>
+        <tr><td>Mutability</td><td>Write-once; edits = new version</td><td>Append-only; never edit or delete</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 02 CAPTURE -->
+  <section id="capture">
+    <h2 class="sec"><span class="num">02</span>What a snapshot must capture</h2>
+    <p>Because the form was <b>generated and personalized</b>, you can't reconstruct it later by re-running the prompt — generation isn't deterministic. So freeze everything needed to reproduce the exact submission:</p>
+    <ul class="tight">
+      <li><b>The answers</b> — the data, validated against the schema.</li>
+      <li><b>The schema/contract version</b> it was validated against.</li>
+      <li><b>The exact form presented</b> — the rendered artifact (HTML or its spec) the client actually saw. Store it; don't regenerate.</li>
+      <li><b>Context</b> — filler identity, tenant, locale, and the originating question/intent.</li>
+      <li><b>Integrity</b> — a content hash (SHA-256) over all of the above; the hash becomes the snapshot's ID.</li>
+    </ul>
+    <div class="callout key"><span class="ic">🔑</span><div class="body"><span class="t">Freeze the presented form — never regenerate it</span><p>The record must be the <em>exact</em> thing the human saw and acted on. A regenerated form is a different artifact and won't hold up in a dispute or audit.</p></div></div>
+    <div class="code-block">
+      <p class="cap">snapshot record (illustrative)</p>
+      <pre><code>{
+  <span class="k">"snapshot_id"</span>: <span class="s">"sha256:c71b9a…"</span>,        <span class="c">// = hash of this record's content</span>
+  <span class="k">"submission_of"</span>: <span class="s">"questionnaire/acme-kyc"</span>,
+  <span class="k">"form_version"</span>: <span class="s">"fv_2f8c… (frozen)"</span>,    <span class="c">// schema + exact rendered artifact</span>
+  <span class="k">"answers"</span>: { <span class="k">"legal_name"</span>: <span class="s">"Acme Ltd"</span>, <span class="k">"turnover"</span>: <span class="n">4200000</span> },
+  <span class="k">"filled_by"</span>: { <span class="k">"id"</span>: <span class="s">"client_88"</span>, <span class="k">"email"</span>: <span class="s">"cfo@acme.com"</span> },
+  <span class="k">"tenant"</span>: <span class="s">"org_17"</span>, <span class="k">"locale"</span>: <span class="s">"en-GB"</span>,
+  <span class="k">"sealed_at"</span>: <span class="s">"2026-06-04T09:12:03Z"</span>,    <span class="c">// server time</span>
+  <span class="k">"timestamp_token"</span>: <span class="s">"rfc3161:MIAGCSq…"</span>   <span class="c">// proves it existed at T</span>
+}</code></pre>
+    </div>
+  </section>
+
+  <!-- 03 IMMUTABLE -->
+  <section id="immutable">
+    <h2 class="sec"><span class="num">03</span>Make it tamper-evident</h2>
+    <p>Immutability is a ladder — climb only as high as the data's stakes require:</p>
+    <table class="t">
+      <thead><tr><th>Tier</th><th>Add this</th><th>Buys you</th></tr></thead>
+      <tbody>
+        <tr><td>Minimum</td><td><b>Content-address</b>: hash the snapshot; the hash is its ID</td><td>Any change is detectable (new hash ≠ old)</td></tr>
+        <tr><td>Strong</td><td><b>WORM storage</b> (S3 Object Lock / append-only) + <b>RFC 3161 trusted timestamp</b></td><td>Can't be edited/deleted; can't be back-dated</td></tr>
+        <tr><td>Legal</td><td><b>Digital / e-signature</b> (eIDAS · ESIGN · UETA), capturing signer identity + intent</td><td>Non-repudiation — admissible as a signed record</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.96rem;color:var(--muted)">A trusted timestamp is the cheap, high-leverage one: a third-party authority cryptographically attests the hash existed at time <code>T</code>, and <em>nobody</em> — including you — can backdate it. Open authorities (e.g. sigstore) make it a single call.</p>
+  </section>
+
+  <!-- 04 AUDIT -->
+  <section id="audit">
+    <h2 class="sec"><span class="num">04</span>The audit log — append-only, hash-chained</h2>
+    <p>A separate, append-only store. Every meaningful event becomes one entry; entries are never edited. Log the whole lifecycle:</p>
+    <p style="font-size:.97rem"><code>generated</code> → <code>shared</code> → <code>opened</code> → <code>field&nbsp;changed</code> (optional) → <code>submitted</code> → <code>sealed</code> → <code>viewed/exported/amended</code></p>
+    <p>Each entry records <b>actor</b> (id + role), <b>action</b>, <b>target</b> (snapshot id + version), <b>trusted timestamp</b>, and <b>source</b> (IP / device / session). Tamper-evidence comes from <b>chaining</b>: each entry embeds the hash of the previous one, so removing or altering any entry breaks the chain.</p>
+
+    <figure>
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hash-chained audit log entries">
+        <defs><marker id="ac" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8b5cf6"/></marker>
+        <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#10b981"/></marker></defs>
+        <g font-family="'JetBrains Mono', monospace">
+          <!-- entry n-1 -->
+          <rect x="20" y="44" width="190" height="92" rx="11" fill="#f7f8fc" stroke="#d8dae6" stroke-width="1.5"/>
+          <text x="34" y="68" font-size="12" font-weight="700" fill="#1f2433" font-family="Inter">event: opened</text>
+          <text x="34" y="92" font-size="11" fill="#8a93a6">prev_hash 4d1e…</text>
+          <text x="34" y="112" font-size="11" fill="#5b51e8">hash&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;9f2a…</text>
+          <!-- entry n -->
+          <rect x="265" y="44" width="190" height="92" rx="11" fill="#f7f8fc" stroke="#d8dae6" stroke-width="1.5"/>
+          <text x="279" y="68" font-size="12" font-weight="700" fill="#1f2433" font-family="Inter">event: submitted</text>
+          <text x="279" y="92" font-size="11" fill="#8a93a6">prev_hash 9f2a…</text>
+          <text x="279" y="112" font-size="11" fill="#5b51e8">hash&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c71b…</text>
+          <!-- entry n+1 -->
+          <rect x="510" y="44" width="190" height="92" rx="11" fill="#f7f8fc" stroke="#d8dae6" stroke-width="1.5"/>
+          <text x="524" y="68" font-size="12" font-weight="700" fill="#1f2433" font-family="Inter">event: sealed</text>
+          <text x="524" y="92" font-size="11" fill="#8a93a6">prev_hash c71b…</text>
+          <text x="524" y="112" font-size="11" fill="#5b51e8">hash&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a05d…</text>
+        </g>
+        <path d="M210,118 C235,118 240,96 263,96" fill="none" stroke="#8b5cf6" stroke-width="2" marker-end="url(#ac)"/>
+        <path d="M455,118 C480,118 485,96 508,96" fill="none" stroke="#8b5cf6" stroke-width="2" marker-end="url(#ac)"/>
+        <text x="360" y="160" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#7c3aed">each entry’s hash becomes the next entry’s prev_hash</text>
+        <path d="M605,44 C605,22 660,22 660,40" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#ag)"/>
+        <text x="690" y="30" text-anchor="end" font-family="Inter" font-size="11" fill="#047857">anchor latest hash → external TSA</text>
+      </svg>
+      <figcaption>Chaining makes deletion and edits detectable. Periodically <b>anchor</b> the latest hash to an external authority so an insider can't quietly rewrite both the log and its keys. <b>Verify</b> on a schedule (walk the chain, recompute).</figcaption>
+    </figure>
+    <div class="callout tip"><span class="ic">🔧</span><div class="body"><span class="t">Two upgrades when it scales</span><p>Use <b>HMAC-SHA256</b> (a keyed hash) so an attacker can't recompute valid hashes; switch to a <b>Merkle tree</b> when linear chain-verification gets slow (it gives logarithmic proofs).</p></div></div>
+  </section>
+
+  <!-- 05 WHERE -->
+  <section id="where">
+    <h2 class="sec"><span class="num">05</span>Seal server-side, on submit</h2>
+    <p>The artifact is just a <b>skin</b>. It POSTs structured data to your backend — the <b>spine</b> — and the server does the sealing. The client never computes its own integrity; a hash or timestamp sent from the browser proves nothing.</p>
+    <figure>
+      <svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sealing happens on the server when the client submits">
+        <defs><marker id="af2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <g font-family="Inter">
+          <!-- client -->
+          <rect x="20" y="74" width="138" height="64" rx="12" fill="#eff6ff" stroke="#bcd6fb" stroke-width="1.5"/>
+          <text x="89" y="100" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1d4ed8">Client portal</text>
+          <text x="89" y="118" text-anchor="middle" font-size="11" fill="#5b6478">filled artifact</text>
+          <!-- server -->
+          <rect x="250" y="40" width="220" height="132" rx="13" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+          <text x="360" y="64" text-anchor="middle" font-size="12.5" font-weight="800" fill="#4338ca">Your server — seal</text>
+          <text x="270" y="88" font-size="11.5" fill="#3b3f72">1 · validate vs schema</text>
+          <text x="270" y="108" font-size="11.5" fill="#3b3f72">2 · build snapshot + SHA-256</text>
+          <text x="270" y="128" font-size="11.5" fill="#3b3f72">3 · write WORM (immutable)</text>
+          <text x="270" y="148" font-size="11.5" fill="#3b3f72">4 · append audit event</text>
+          <!-- stores -->
+          <rect x="540" y="48" width="160" height="48" rx="11" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+          <text x="620" y="69" text-anchor="middle" font-size="12" font-weight="700" fill="#047857">Snapshot store</text>
+          <text x="620" y="85" text-anchor="middle" font-size="10.5" fill="#5b6478">WORM, content-addressed</text>
+          <rect x="540" y="116" width="160" height="48" rx="11" fill="#fff7ed" stroke="#fbd9a8" stroke-width="1.5"/>
+          <text x="620" y="137" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">Audit log</text>
+          <text x="620" y="153" text-anchor="middle" font-size="10.5" fill="#5b6478">append-only, chained</text>
+        </g>
+        <line x1="158" y1="106" x2="248" y2="106" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af2)"/>
+        <text x="203" y="98" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">POST answers</text>
+        <line x1="470" y1="74" x2="538" y2="72" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af2)"/>
+        <line x1="470" y1="140" x2="538" y2="140" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af2)"/>
+        <path d="M250,160 C150,196 150,150 158,134" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#af2)"/>
+        <text x="150" y="186" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#047857">receipt: id · hash · timestamp</text>
+      </svg>
+      <figcaption>One server action, atomic: validate → snapshot + hash → write WORM → append audit → return a receipt the client can keep.</figcaption>
+    </figure>
+    <div class="callout note"><span class="ic">💾</span><div class="body"><span class="t">If you lean on a platform's artifact storage</span><p>Claude/ChatGPT artifact persistence is convenient, but it is <b>not</b> your system of record. <b>Export and re-seal</b> the submission into your own WORM + audit store; that's the copy you can govern, retain, and defend.</p></div></div>
+  </section>
+
+  <!-- 06 UPDATES -->
+  <section id="updates">
+    <h2 class="sec"><span class="num">06</span>Updates = new versions</h2>
+    <p>"Living document" doesn't mean mutable. When the client or your user changes something later:</p>
+    <ul class="tight">
+      <li>Write a <b>new snapshot version</b> — the previous one stays frozen, forever.</li>
+      <li>The new version <b>links to its parent</b> (a version chain), so you have the full lineage.</li>
+      <li>Append an <b>audit event</b> with who, when, and the <b>diff</b>.</li>
+    </ul>
+    <p>Result: you can render the record <b>as of any point in time</b> and show exactly how it evolved — without ever overwriting history.</p>
+  </section>
+
+  <!-- 07 MODEL -->
+  <section id="model">
+    <h2 class="sec"><span class="num">07</span>Data model at a glance</h2>
+    <table class="t">
+      <thead><tr><th>Store</th><th>Holds</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">form_versions</span></td><td>Schema + the exact frozen rendered artifact</td><td>Immutable, versioned</td></tr>
+        <tr><td><span class="mono">snapshots</span></td><td>A submission: answers + context + hash, → a <span class="mono">form_version</span></td><td>Write-once; edits → new version</td></tr>
+        <tr><td><span class="mono">audit_events</span></td><td>Lifecycle events, each → a snapshot + version</td><td>Append-only, hash-chained</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.96rem;color:var(--muted)">Keep <code>audit_events</code> in a store with different, stricter write access than your app data — ideally one where deletes are blocked and recoverable.</p>
+  </section>
+
+  <!-- 08 PITFALLS -->
+  <section id="pitfalls">
+    <h2 class="sec"><span class="num">08</span>Pitfalls</h2>
+    <ul class="tight">
+      <li><b>Regenerating to "reconstruct."</b> Freeze the presented form; never re-run the prompt to recreate it.</li>
+      <li><b>Trusting the client.</b> Seal server-side; client-supplied hashes/timestamps are meaningless.</li>
+      <li><b>Mixing audit into app data.</b> Separate store, append-only, restricted writes.</li>
+      <li><b>Dropping the schema version.</b> Store it, or old submissions become uninterpretable as the contract evolves.</li>
+      <li><b>Client clocks.</b> Use server / trusted time only.</li>
+      <li><b>Chaining but never checking.</b> A chain only helps if you verify it on a schedule and anchor externally.</li>
+      <li><b>Forgetting PII duty.</b> Encrypt at rest, log access, support retention &amp; legal-hold.</li>
+    </ul>
+  </section>
+
+  <div class="takeaways">
+    <h2>Takeaways</h2>
+    <ul>
+      <li><span class="tx"><b>Snapshot = state, audit log = events.</b> Both, in separate stores.</span></li>
+      <li><span class="tx"><b>Freeze the exact presented form</b> — generated UI can't be reconstructed deterministically.</span></li>
+      <li><span class="tx"><b>Content-hash → WORM → trusted timestamp</b> is the high-leverage immutability stack; sign if it's a legal record.</span></li>
+      <li><span class="tx"><b>Hash-chain the audit log</b>, anchor it externally, and verify on a schedule.</span></li>
+      <li><span class="tx"><b>Seal server-side</b>; updates create new versions, never overwrite.</span></li>
+    </ul>
+  </div>
+
+  <p style="text-align:center;margin-top:34px;color:var(--muted)">Companion to <a href="html-artifacts.html" style="color:var(--primary-dark);font-weight:600">HTML Artifacts &amp; the End of the Static Form</a> — this is the "spine" made concrete.</p>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><a href="https://www.designgurus.io/answers/detail/how-do-you-design-tamperevident-audit-logs-merkle-trees-hashing">Designing tamper-evident audit logs (hash chains &amp; Merkle trees)</a> · <a href="https://tracehold.ai/blog/immutable-audit-log-hmac-hash-chain/">Immutable audit logs with HMAC hash-chaining</a></li>
+      <li><a href="https://www.metaspike.com/trusted-timestamping-rfc-3161-digital-forensics/">RFC 3161 trusted timestamping explained</a> · <a href="https://github.com/sigstore/timestamp-authority">sigstore — open RFC 3161 timestamp authority</a></li>
+      <li><a href="https://www.folderit.com/blog/worm-object-lock-immutable-archives/">WORM &amp; S3 Object Lock for immutable archives</a></li>
+      <li><a href="https://mattermost.com/blog/compliance-by-design-18-tips-to-implement-tamper-proof-audit-logs/">Compliance-by-design: tamper-proof audit logs</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Part of the <a href="../index.html">Learning</a> series · researched &amp; explained to be understood, not memorized.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button'); btn.className = 'copy-btn'; btn.textContent = 'Copy';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(block.querySelector('code').innerText).then(function () {
+        btn.textContent = 'Copied!'; btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1600);
+      });
+    });
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>
