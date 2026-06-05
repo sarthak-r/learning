@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Software 3.0, Under Supervision — Learning</title>
+<meta name="description" content="What agentic 'Software 3.0' actually looks like inside a regulated B2B SaaS, using financial advisory as the test case: the autonomy slider, the compliance spine, the 2026 regulatory reality, and the business-model shift." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 800px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 870px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 670px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 800px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 54px 0 6px; line-height: 1.22; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 24px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.12rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .88em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout.tip { background: var(--tip-soft); border-color: #c7f0dd; } .callout.tip .t { color: #047857; }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14.5px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 12px 15px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+  table.t .lvl { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .l-hi { color: #047857; } .l-mid { color: #1d4ed8; } .l-low { color: #b45309; } .l-no { color: #b91c1c; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .panel h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+  .panel.good h4 { color: #047857; } .panel.bad h4 { color: #b91c1c; }
+  .panel ul { margin: 0; padding-left: 0; list-style: none; }
+  .panel li { padding-left: 22px; position: relative; margin: 8px 0; font-size: .95rem; color: #2b3142; }
+  .panel.good li::before { content: "✓"; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+  .panel.bad li::before { content: "✕"; position: absolute; left: 0; color: #ef4444; font-weight: 700; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 5px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Software 3.0 · Regulated</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🏛️ Software 3.0 · Regulated B2B SaaS</span>
+  <h1>Software 3.0, Under Supervision</h1>
+  <p class="lede">Software 3.0 says: let agents do the work. A regulated industry says: every action must be supervised, recorded, and owned by a human. This is how those two reconcile — using financial advisory (RIAs &amp; wealth) as the test case.</p>
+  <div class="meta-row">
+    <span>⏱️ ~14 min</span>
+    <span>🧭 Strategic synthesis</span>
+    <span>🔎 Latest — June 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#means">What "Software 3.0" means here</a></li>
+    <li><a href="#collision">The collision</a></li>
+    <li><a href="#arch">The reference architecture</a></li>
+    <li><a href="#slider">Where the autonomy slider sits</a></li>
+    <li><a href="#reg">The 2026 regulatory reality</a></li>
+    <li><a href="#biz">The business-model shift</a></li>
+    <li><a href="#build">Build now vs avoid</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 MEANS -->
+  <section id="means">
+    <h2 class="sec"><span class="num">01</span>What "Software 3.0" means here</h2>
+    <p class="lead-in">Karpathy's framing: the LLM is the new compute, English-plus-context is the program, and work happens in a <b>generation → verification loop</b>. The product knob that matters is his <b>autonomy slider</b> — how much the AI does before a human checks. In a regulated industry, you <b>start it low and earn the right to raise it.</b></p>
+    <p>So "Software 3.0 for financial advisory" isn't a chatbot bolted onto a CRM. It's agents performing real workflows, wrapped in controls strict enough that a regulator, a client, and your own compliance officer would all sign off.</p>
+  </section>
+
+  <!-- 02 COLLISION -->
+  <section id="collision">
+    <h2 class="sec"><span class="num">02</span>The collision</h2>
+    <p>Two value systems meet head-on. Naming the tension is half the design:</p>
+    <table class="t">
+      <thead><tr><th>Software 3.0 pulls toward…</th><th>Regulated advisory demands…</th></tr></thead>
+      <tbody>
+        <tr><td>Autonomy — agents act</td><td>Supervision — a named human is accountable (fiduciary duty)</td></tr>
+        <tr><td>Non-deterministic, emergent</td><td>Deterministic, reproducible, <b>explainable</b></td></tr>
+        <tr><td>Fast natural-language generation</td><td>Recorded, auditable, <b>retained</b> (books &amp; records)</td></tr>
+        <tr><td>Ship and iterate</td><td>Validate &amp; govern <em>before</em> deploy (model risk)</td></tr>
+      </tbody>
+    </table>
+    <div class="callout key"><span class="ic">🎯</span><div class="body"><span class="t">You don't pick a side</span><p>You constrain Software 3.0 with a <b>deterministic governance spine</b>, and keep a licensed human as the <b>fiduciary of record</b>. Autonomy where stakes are low and recorded; humans where it's advice or money.</p></div></div>
+  </section>
+
+  <!-- 03 ARCH -->
+  <section id="arch">
+    <h2 class="sec"><span class="num">03</span>The reference architecture</h2>
+    <p>One picture: agents do the work, a deterministic spine governs <em>every</em> action, and a human owns anything that is advice or moves money.</p>
+    <figure>
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reference architecture: agents, compliance spine, human of record">
+        <defs><marker id="ad" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <!-- agents band -->
+        <rect x="60" y="22" width="600" height="64" rx="13" fill="#ede9fe" stroke="#cbb9fb" stroke-width="1.5"/>
+        <text x="360" y="47" text-anchor="middle" font-family="Inter" font-size="14.5" font-weight="800" fill="#6d28d9">Agents — do the work</text>
+        <text x="360" y="69" text-anchor="middle" font-family="Inter" font-size="12" fill="#5b6478">draft · summarize · screen KYC · prep meetings · research · reconcile</text>
+        <line x1="360" y1="86" x2="360" y2="104" stroke="#9aa3b8" stroke-width="2" marker-end="url(#ad)"/>
+        <text x="486" y="100" font-family="Inter" font-size="11" font-style="italic" fill="#8a93a6">every action passes through ↓</text>
+        <!-- spine band -->
+        <rect x="60" y="108" width="600" height="120" rx="13" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="360" y="132" text-anchor="middle" font-family="Inter" font-size="14.5" font-weight="800" fill="#4338ca">Compliance spine — deterministic, you own it</text>
+        <g font-family="Inter" font-size="11.5" font-weight="600">
+          <rect x="78" y="146" width="120" height="32" rx="8" fill="#fff" stroke="#d6d3f5"/><text x="138" y="166" text-anchor="middle" fill="#4338ca">permissions · PII</text>
+          <rect x="206" y="146" width="120" height="32" rx="8" fill="#fff" stroke="#d6d3f5"/><text x="266" y="166" text-anchor="middle" fill="#4338ca">supervision · HITL</text>
+          <rect x="334" y="146" width="130" height="32" rx="8" fill="#fff" stroke="#d6d3f5"/><text x="399" y="166" text-anchor="middle" fill="#4338ca">records (WORM)+audit</text>
+          <rect x="472" y="146" width="92" height="32" rx="8" fill="#fff" stroke="#d6d3f5"/><text x="518" y="166" text-anchor="middle" fill="#4338ca">model risk</text>
+          <rect x="572" y="146" width="74" height="32" rx="8" fill="#fff" stroke="#d6d3f5"/><text x="609" y="166" text-anchor="middle" fill="#4338ca">explain</text>
+        </g>
+        <text x="360" y="204" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#5b6478">evals &amp; monitoring · source citations · tamper-evident trail · least-privilege data</text>
+        <line x1="360" y1="228" x2="360" y2="246" stroke="#9aa3b8" stroke-width="2" marker-end="url(#ad)"/>
+        <!-- human band -->
+        <rect x="170" y="250" width="380" height="58" rx="13" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+        <text x="360" y="274" text-anchor="middle" font-family="Inter" font-size="14" font-weight="800" fill="#047857">Human — fiduciary of record</text>
+        <text x="360" y="294" text-anchor="middle" font-family="Inter" font-size="12" fill="#3b6b57">approves advice · owns the recommendation</text>
+        <line x1="360" y1="308" x2="360" y2="326" stroke="#9aa3b8" stroke-width="2" marker-end="url(#ad)"/>
+        <text x="360" y="345" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#1f2433">→ client / action</text>
+      </svg>
+      <figcaption>The agent is the <em>skin</em>; the compliance spine is the <em>product</em>. Recordkeeping &amp; audit are detailed in <a href="sealing-artifacts.html">Sealing a Filled Artifact</a>.</figcaption>
+    </figure>
+    <div class="callout note"><span class="ic">🏰</span><div class="body"><span class="t">The reframe that matters</span><p>In regulated finance, <b>compliance is the moat, not the tax.</b> The agent layer commoditizes fast; your supervision, records, and trust don't.</p></div></div>
+  </section>
+
+  <!-- 04 SLIDER -->
+  <section id="slider">
+    <h2 class="sec"><span class="num">04</span>Where the autonomy slider sits</h2>
+    <figure>
+      <svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The autonomy slider mapped to stakes">
+        <text x="40" y="30" font-family="Inter" font-size="12.5" font-weight="600" fill="#047857">← lower stakes</text>
+        <text x="680" y="30" text-anchor="end" font-family="Inter" font-size="12.5" font-weight="600" fill="#b91c1c">higher stakes · human accountable →</text>
+        <defs><linearGradient id="slider" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#10b981"/><stop offset="0.4" stop-color="#2f7df6"/><stop offset="0.72" stop-color="#f59e0b"/><stop offset="1" stop-color="#ef4444"/>
+        </linearGradient></defs>
+        <rect x="40" y="44" width="640" height="14" rx="7" fill="url(#slider)"/>
+        <g font-family="Inter">
+          <circle cx="120" cy="51" r="9" fill="#fff" stroke="#10b981" stroke-width="3"/>
+          <text x="120" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2433">Read-only</text>
+          <text x="120" y="100" text-anchor="middle" font-size="11" fill="#5b6478">surface · assist</text>
+          <circle cx="300" cy="51" r="9" fill="#fff" stroke="#2f7df6" stroke-width="3"/>
+          <text x="300" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2433">Draft</text>
+          <text x="300" y="100" text-anchor="middle" font-size="11" fill="#5b6478">human approves</text>
+          <circle cx="480" cy="51" r="9" fill="#fff" stroke="#f59e0b" stroke-width="3"/>
+          <text x="480" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2433">Execute</text>
+          <text x="480" y="100" text-anchor="middle" font-size="11" fill="#5b6478">with approval (HITL)</text>
+          <circle cx="640" cy="51" r="9" fill="#fff" stroke="#ef4444" stroke-width="3"/>
+          <text x="640" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2433">Autonomous</text>
+          <text x="640" y="100" text-anchor="middle" font-size="11" fill="#5b6478">rare · low-stakes</text>
+        </g>
+        <path d="M44,128 L44,140 L536,140 L536,128" fill="none" stroke="#10b981" stroke-width="2"/>
+        <text x="290" y="160" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#047857">where regulated advisory work lives</text>
+        <path d="M600,128 L600,140 L676,140 L676,128" fill="none" stroke="#b91c1c" stroke-width="2"/>
+        <text x="638" y="160" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#b91c1c">✕ advice &amp; money</text>
+        <text x="360" y="192" text-anchor="middle" font-family="Inter" font-size="12.5" font-style="italic" fill="#5b6478">Rule: the more it looks like advice or touches money, the lower the slider — and the brighter the human's name on it.</text>
+      </svg>
+      <figcaption>Set autonomy per workflow, not per product. Advice and money movement never reach "autonomous."</figcaption>
+    </figure>
+    <table class="t">
+      <thead><tr><th>Workflow</th><th>Safe autonomy</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Meeting notes, CRM hygiene</td><td class="lvl l-hi">draft · light review</td><td>Low stakes — but still a recorded business communication</td></tr>
+        <tr><td>Research, prep, summaries</td><td class="lvl l-mid">draft · human verifies</td><td>"Jagged" model errors; require source citations</td></tr>
+        <tr><td>Client emails &amp; plans</td><td class="lvl l-mid">draft → approve</td><td>Comms are supervised &amp; must be retained</td></tr>
+        <tr><td>Suitability / recommendations</td><td class="lvl l-no">human owns · AI assists</td><td>Fiduciary duty — the AI is never the adviser</td></tr>
+        <tr><td>Trades / money movement</td><td class="lvl l-low">execute only w/ approval</td><td>Hard human-in-the-loop gate; never autonomous</td></tr>
+        <tr><td>Compliance surveillance</td><td class="lvl l-mid">AI flags · human signs off</td><td>Accountability for the review stays human</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 05 REG -->
+  <section id="reg">
+    <h2 class="sec"><span class="num">05</span>The 2026 regulatory reality</h2>
+    <p>The most important update, because it reverses what most older articles say: <b>regulators chose not to write an AI rulebook.</b> They pointed AI at the rules you already have — and made you own the output.</p>
+    <table class="t">
+      <thead><tr><th>Regime</th><th>Where it stands (2026)</th><th>What it means for you</th></tr></thead>
+      <tbody>
+        <tr><td>SEC (US)</td><td>Withdrew the Gensler predictive-analytics conflicts rule (Jun 2025). Atkins: no bespoke AI rules — apply <b>existing</b> frameworks; actively enforces <b>"AI-washing."</b></td><td>Your fiduciary, advertising &amp; books-and-records duties already cover AI. Don't overclaim AI in marketing.</td></tr>
+        <tr><td>FINRA</td><td><b>Technology-neutral</b> (Notice 24-09). Supervision (Rule 3110) + recordkeeping apply; 2026 report adds a section on <b>autonomous agents.</b></td><td>If a human couldn't do it compliantly, neither can your agent. AI outputs can be business records — capture them.</td></tr>
+        <tr><td>EU AI Act</td><td>GPAI/LLM obligations <b>live since Aug 2025</b>; high-risk obligations <b>deferred to Dec 2027</b> (Digital Omnibus). Credit scoring = high-risk.</td><td>Transparency &amp; governance now; heavier conformity later <em>if</em> you touch a high-risk use.</td></tr>
+        <tr><td>NIST (US)</td><td><b>AI RMF</b> + <b>AI Agent Standards Initiative</b> (Jan 2026). Guardrails shifting from best-practice → expectation.</td><td>The de-facto governance checklist examiners and enterprise buyers will reference.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warn"><span class="ic">⚠️</span><div class="body"><span class="t">Not legal advice — and it moves fast</span><p>Rules differ by jurisdiction, license type, and use case, and 2026 is unusually fluid. Treat this as the map, not the territory; confirm specifics with compliance/counsel.</p></div></div>
+  </section>
+
+  <!-- 06 BIZ -->
+  <section id="biz">
+    <h2 class="sec"><span class="num">06</span>The business-model shift</h2>
+    <ul class="tight">
+      <li><b>Service-as-software.</b> Agents deliver <em>outcomes</em>, not features. Pricing drifts from per-seat → usage / credit / outcome-based (Gartner: ≥40% of enterprise SaaS spend usage-, agent-, or outcome-based by 2030).</li>
+      <li><b>The moat moves down the stack.</b> The UI and the agent layer commoditize (agents call APIs directly). What endures: <b>proprietary client data, operational history, compliance infrastructure, and trust.</b></li>
+      <li><b>Selective unbundling.</b> Point AI tools get absorbed; platforms with deep data + compliance depth get stronger. In regulated finance, that depth is the defensibility.</li>
+    </ul>
+    <div class="callout note"><span class="ic">📊</span><div class="body"><span class="t">Reality check on timing</span><p>73% of advisory firms use AI somewhere, but only <b>~6% use agentic tools</b> — this is early. Anthropic's <b>Claude for Financial Services</b> (May 2026: ten finance agents, incl. KYC screening &amp; wealth workflows) signals the direction and the pace.</p></div></div>
+  </section>
+
+  <!-- 07 BUILD -->
+  <section id="build">
+    <h2 class="sec"><span class="num">07</span>Build now vs avoid</h2>
+    <div class="two-col">
+      <div class="panel good">
+        <h4>✓ Build</h4>
+        <ul>
+          <li>Autonomy slider <b>low by default</b>, raised per low-stakes workflow</li>
+          <li>A <b>deterministic compliance spine you own</b> (not the model vendor's)</li>
+          <li>Hard <b>HITL gates</b> on advice &amp; money movement</li>
+          <li>Record everything — <b>WORM + tamper-evident audit</b></li>
+          <li><b>Evals + monitoring</b> (model risk management) before and after deploy</li>
+          <li><b>Source citations &amp; reasoning trails</b> (explainability)</li>
+          <li>Least-privilege data + PII controls; design <b>for examination</b></li>
+        </ul>
+      </div>
+      <div class="panel bad">
+        <h4>✕ Avoid</h4>
+        <ul>
+          <li>AI as the <b>adviser of record</b></li>
+          <li>Full <b>autonomy on advice or trades</b></li>
+          <li><b>"AI-washing"</b> — overclaiming AI in marketing</li>
+          <li><b>Un-archived</b> AI communications</li>
+          <li><b>Black-box</b> recommendations with no rationale</li>
+          <li>Piping <b>client PII into ungoverned models</b></li>
+          <li>Bolting compliance on <em>after</em> the demo works</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="takeaways">
+    <h2>Takeaways</h2>
+    <ul>
+      <li><span class="tx">Software 3.0 = agents working a <b>generation → verification loop</b>, dialed by an <b>autonomy slider</b>.</span></li>
+      <li><span class="tx">In regulated advisory, <b>start the slider low</b>; raise it only where stakes are low and the action is recorded.</span></li>
+      <li><span class="tx">The <b>compliance spine</b> (supervision · WORM/audit · model risk · explainability) is the product — and the moat.</span></li>
+      <li><span class="tx">2026 reg reality: <b>no AI rulebook</b> — existing rules apply, you own the output, AI-washing is enforced, EU high-risk deferred to 2027.</span></li>
+      <li><span class="tx">The human stays the <b>fiduciary of record</b>. AI assists; it never advises.</span></li>
+    </ul>
+  </div>
+
+  <p style="text-align:center;margin-top:34px;color:var(--muted)">Builds on <a href="generative-ui.html" style="color:var(--primary-dark);font-weight:600">Generative UI</a> and <a href="sealing-artifacts.html" style="color:var(--primary-dark);font-weight:600">Sealing a Filled Artifact</a> — the interface and the record, under the same compliance spine.</p>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><b>Software 3.0:</b> <a href="https://www.latent.space/p/s3">Karpathy — "Software Is Changing (Again)"</a> (the autonomy slider)</li>
+      <li><b>SEC:</b> <a href="https://www.wealthmanagement.com/regulation-compliance/sec-withdraws-ai-and-esg-proposed-rules-from-gensler-s-tenure">SEC withdraws the predictive-analytics rule (Jun 2025)</a> · <a href="https://www.kitces.com/blog/artificial-intelligence-compliance-considerations-investment-advisers-sec-securities-exchange-commission-legal-regulation-framework/">Kitces — applying existing SEC frameworks to AI</a></li>
+      <li><b>FINRA:</b> <a href="https://www.finra.org/rules-guidance/notices/24-09">Regulatory Notice 24-09 (Gen AI)</a> · <a href="https://www.finra.org/rules-guidance/guidance/reports/2026-finra-annual-regulatory-oversight-report/gen-ai">2026 Oversight Report — Gen AI &amp; autonomous agents</a></li>
+      <li><b>EU AI Act:</b> <a href="https://artificialintelligenceact.eu/implementation-timeline/">Implementation timeline</a> · <a href="https://www.insideprivacy.com/artificial-intelligence/eu-ai-act-update-timeline-relief-targeted-simplification-and-new-prohibitions/">Digital Omnibus — high-risk deferral</a></li>
+      <li><b>Governance:</b> <a href="https://www.nist.gov/itl/ai-risk-management-framework">NIST AI Risk Management Framework</a></li>
+      <li><b>Market:</b> <a href="https://www.deloitte.com/us/en/insights/industry/financial-services/financial-services-industry-predictions/2026/agentic-ai-wealth-management-productivity.html">Deloitte — agentic AI in wealth management</a> · <a href="https://www.anthropic.com/news/claude-for-financial-services">Anthropic — Claude for Financial Services</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Part of the <a href="../index.html">Learning</a> series · researched &amp; explained to be understood, not memorized.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+</script>
+</body>
+</html>
