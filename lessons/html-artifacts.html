@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HTML Artifacts &amp; the End of the Static Form — Learning</title>
+<meta name="description" content="When an LLM can generate a personalized interface on demand, what happens to the form? A conceptual deep dive into HTML artifacts, generative UI, durable-vs-generated data, and where information collection is heading." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 780px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 860px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 660px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 780px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 56px 0 6px; line-height: 1.22; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 26px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.12rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .88em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; }
+  .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout.tip { background: var(--tip-soft); border-color: #c7f0dd; } .callout.tip .t { color: #047857; }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout.meta { background: linear-gradient(180deg,#eef9ff,#ffffff); border-color: #cfeafe; } .callout.meta .t { color: #0e7490; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14.5px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 12px 15px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .panel h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+  .panel.good h4 { color: #047857; } .panel.bad h4 { color: #b91c1c; }
+  .panel ul { margin: 0; padding-left: 0; list-style: none; }
+  .panel li { padding-left: 22px; position: relative; margin: 8px 0; font-size: .96rem; color: #2b3142; }
+  .panel.good li::before { content: "✓"; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+  .panel.bad li::before { content: "✕"; position: absolute; left: 0; color: #ef4444; font-weight: 700; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 5px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>HTML Artifacts</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🧩 Interfaces · Generative UI</span>
+  <h1>HTML Artifacts &amp; the End of the Static Form</h1>
+  <p class="lede">For 20 years, a form was something you built <em>once</em> and sent to <em>everyone</em>. When an LLM can generate a tailored interface on demand, that assumption breaks. Here's what actually changes about collecting information — and why it runs deeper than forms.</p>
+  <div class="meta-row">
+    <span>⏱️ ~13 min</span>
+    <span>🧠 Conceptual — not a how-to</span>
+    <span>🔎 Researched June 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#shift">The shift, in one idea</a></li>
+    <li><a href="#what">What an HTML artifact <em>is</em></a></li>
+    <li><a href="#old">The old world of input-taking</a></li>
+    <li><a href="#change">What changes when UI is generated</a></li>
+    <li><a href="#skin-spine">The catch: skin vs spine</a></li>
+    <li><a href="#persistence">"Saved as a document" — the 2026 reality</a></li>
+    <li><a href="#b2b">Your B2B picture</a></li>
+    <li><a href="#proscons">Pros &amp; cons</a></li>
+    <li><a href="#deeper">The deeper shift: malleable software</a></li>
+    <li><a href="#think">How to think about it</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 SHIFT -->
+  <section id="shift">
+    <h2 class="sec"><span class="num">01</span>The shift, in one idea</h2>
+    <p class="lead-in">The interface used to be made at <b>build time</b> and shipped identically to everyone. Now it can be made at <b>runtime</b>, shaped for one person and one moment. Collecting information stops being "fill out my form" and becomes "here is an interface generated for <em>you</em>."</p>
+    <div class="callout meta"><span class="ic">🪞</span><div class="body"><span class="t">You're looking at one right now</span><p>This page is an HTML artifact — self-contained, generated, rendered live in your browser. The thing you're learning about is the medium you're reading it in.</p></div></div>
+  </section>
+
+  <!-- 02 WHAT -->
+  <section id="what">
+    <h2 class="sec"><span class="num">02</span>What an HTML artifact <em>is</em></h2>
+    <p>An <b>HTML artifact</b> is self-contained, runnable HTML/CSS/JS that a model generates and renders inline — software produced as the output of a conversation. Not prose, not a static document, not a pre-built app. A fourth thing on this ladder:</p>
+    <table class="t">
+      <thead><tr><th>Output</th><th>What it is</th><th>Interactive?</th><th>Made when?</th></tr></thead>
+      <tbody>
+        <tr><td>Text</td><td>An answer you read</td><td>No</td><td>—</td></tr>
+        <tr><td>Document</td><td>A file you keep (PDF, .docx)</td><td>Barely (fields)</td><td>Build time</td></tr>
+        <tr><td>App</td><td>Software a team ships</td><td>Yes</td><td>Build time</td></tr>
+        <tr><td><b>Artifact</b></td><td><b>Bespoke software, generated on demand</b></td><td><b>Yes</b></td><td><b>Runtime, per request</b></td></tr>
+      </tbody>
+    </table>
+    <p>The defining trait isn't the HTML — it's <b>when</b> and <b>for whom</b> it's made: disposable, personalized software, conjured for a single context instead of authored once for a market.</p>
+  </section>
+
+  <!-- 03 OLD -->
+  <section id="old">
+    <h2 class="sec"><span class="num">03</span>The old world of input-taking</h2>
+    <p>Three tools defined the last era. They differ on the surface but share one DNA: <b>authored once, fixed, identical for all.</b></p>
+    <table class="t">
+      <thead><tr><th>Tool</th><th>Strength</th><th>Built-in limit</th></tr></thead>
+      <tbody>
+        <tr><td>Google Forms</td><td>Free, instant, structured → spreadsheet</td><td>Rigid, generic, manual skip-logic</td></tr>
+        <tr><td>Typeform</td><td>One-question flow lifts completion</td><td>Still one script for every respondent</td></tr>
+        <tr><td>PDF forms (AcroForm)</td><td>Portable, printable, legal record</td><td>Fixed layout; clunky to fill &amp; parse</td></tr>
+      </tbody>
+    </table>
+    <p>Their shared strengths are exactly what business needs: <b>structured, validated, auditable, predictable</b> data. Their shared weakness is everything that comes from being frozen at authoring time: <b>impersonal, one-size-fits-all, costly to tailor</b>, and longer = more abandonment.</p>
+  </section>
+
+  <!-- 04 CHANGE -->
+  <section id="change">
+    <h2 class="sec"><span class="num">04</span>What changes when the UI is generated</h2>
+    <p>On-demand generation flips four axes at once:</p>
+    <ul class="tight">
+      <li><b>Build-time → runtime.</b> The form is created at the moment of need, not before.</li>
+      <li><b>One-for-all → one-for-one.</b> Tailored to the recipient: pre-filled with what you know, reworded for their context, trimmed to only the relevant questions.</li>
+      <li><b>Fixed → adaptive.</b> It branches and asks follow-ups based on answers — no rules engine, the model decides.</li>
+      <li><b>Author fields → describe intent.</b> You state <em>what</em> you need to learn; the artifact is generated. Authoring effort collapses.</li>
+    </ul>
+    <p>That turns "the form" into a spectrum of intake styles you can dial per use case:</p>
+    <figure>
+      <svg viewBox="0 0 720 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The spectrum from static forms to agentic intake">
+        <defs><linearGradient id="spec" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#2f7df6"/><stop offset="0.4" stop-color="#5b51e8"/><stop offset="0.7" stop-color="#8b5cf6"/><stop offset="1" stop-color="#f59e0b"/>
+        </linearGradient></defs>
+        <text x="40" y="30" font-family="Inter" font-size="12.5" font-weight="600" fill="#5b6478">← more deterministic · consistent · auditable</text>
+        <text x="680" y="30" text-anchor="end" font-family="Inter" font-size="12.5" font-weight="600" fill="#b45309">more personalized · adaptive →</text>
+        <rect x="40" y="44" width="640" height="14" rx="7" fill="url(#spec)"/>
+        <g font-family="Inter">
+          <circle cx="110" cy="51" r="9" fill="#fff" stroke="#2f7df6" stroke-width="3"/>
+          <text x="110" y="92" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f2433">Static form</text>
+          <text x="110" y="110" text-anchor="middle" font-size="11.5" fill="#5b6478">Google Forms,</text>
+          <text x="110" y="125" text-anchor="middle" font-size="11.5" fill="#5b6478">PDF</text>
+          <circle cx="300" cy="51" r="9" fill="#fff" stroke="#5b51e8" stroke-width="3"/>
+          <text x="300" y="92" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f2433">AI-authored</text>
+          <text x="300" y="110" text-anchor="middle" font-size="11.5" fill="#5b6478">describe → generate,</text>
+          <text x="300" y="125" text-anchor="middle" font-size="11.5" fill="#5b6478">then fixed</text>
+          <circle cx="490" cy="51" r="9" fill="#fff" stroke="#8b5cf6" stroke-width="3"/>
+          <text x="490" y="92" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f2433">Adaptive</text>
+          <text x="490" y="110" text-anchor="middle" font-size="11.5" fill="#5b6478">personalized &amp;</text>
+          <text x="490" y="125" text-anchor="middle" font-size="11.5" fill="#5b6478">branching at runtime</text>
+          <circle cx="640" cy="51" r="9" fill="#fff" stroke="#f59e0b" stroke-width="3"/>
+          <text x="640" y="92" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f2433">Agentic</text>
+          <text x="640" y="110" text-anchor="middle" font-size="11.5" fill="#5b6478">AI interviews,</text>
+          <text x="640" y="125" text-anchor="middle" font-size="11.5" fill="#5b6478">structures answers</text>
+        </g>
+        <text x="360" y="165" text-anchor="middle" font-family="Inter" font-size="12" font-style="italic" fill="#8a93a6">Typeform's conversational "Formless" lives near the right; it reports 30–50% higher completion than static forms.</text>
+      </svg>
+      <figcaption>You no longer pick a <em>product</em>; you pick a <b>point on this spectrum</b> per task — and can move along it for free.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 05 SKIN VS SPINE -->
+  <section id="skin-spine">
+    <h2 class="sec"><span class="num">05</span>The catch: generated skin, durable spine</h2>
+    <p>Here's the tension that decides everything for business use. A generated interface is <b>non-deterministic and ephemeral</b> — each one is a little different and, by default, remembers nothing. But business data must be <b>consistent, durable, and auditable</b>. Generated structured output is good, not perfect: current models still make <b>sporadic field-level errors</b>, which is why enterprise setups add schema enforcement and trust-scoring.</p>
+    <p>The resolution is to stop treating the artifact as the thing of record. Split it in two:</p>
+    <figure>
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Many generated skins funnel into one durable spine">
+        <text x="360" y="26" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#b45309">SKIN — generated, personalized, disposable</text>
+        <!-- three artifact cards -->
+        <g font-family="Inter">
+          <rect x="60" y="44" width="160" height="96" rx="12" fill="#eff6ff" stroke="#bcd6fb" stroke-width="1.5"/>
+          <text x="140" y="66" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1d4ed8">Client A · fintech</text>
+          <rect x="78" y="78" width="124" height="9" rx="4" fill="#cdddf7"/><rect x="78" y="94" width="124" height="9" rx="4" fill="#cdddf7"/><rect x="78" y="110" width="80" height="9" rx="4" fill="#cdddf7"/>
+          <rect x="280" y="44" width="160" height="96" rx="12" fill="#fff7ed" stroke="#fbd9a8" stroke-width="1.5"/>
+          <text x="360" y="66" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b45309">Client B · retail</text>
+          <rect x="298" y="78" width="124" height="9" rx="4" fill="#f6dcb4"/><rect x="298" y="94" width="90" height="9" rx="4" fill="#f6dcb4"/><rect x="298" y="110" width="124" height="9" rx="4" fill="#f6dcb4"/>
+          <rect x="500" y="44" width="160" height="96" rx="12" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+          <text x="580" y="66" text-anchor="middle" font-size="12.5" font-weight="700" fill="#047857">Client C · health</text>
+          <rect x="518" y="78" width="124" height="9" rx="4" fill="#bce9d2"/><rect x="518" y="94" width="124" height="9" rx="4" fill="#bce9d2"/><rect x="518" y="110" width="70" height="9" rx="4" fill="#bce9d2"/>
+        </g>
+        <!-- arrows down to schema -->
+        <defs><marker id="ad" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a9b0c2"/></marker></defs>
+        <path d="M140,140 L350,178" fill="none" stroke="#a9b0c2" stroke-width="2" marker-end="url(#ad)"/>
+        <path d="M360,140 L360,178" fill="none" stroke="#a9b0c2" stroke-width="2" marker-end="url(#ad)"/>
+        <path d="M580,140 L372,178" fill="none" stroke="#a9b0c2" stroke-width="2" marker-end="url(#ad)"/>
+        <!-- schema funnel -->
+        <rect x="250" y="186" width="220" height="40" rx="10" fill="#1f2433"/>
+        <text x="360" y="211" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#fff">one schema / data contract</text>
+        <line x1="360" y1="226" x2="360" y2="250" stroke="#a9b0c2" stroke-width="2" marker-end="url(#ad)"/>
+        <!-- spine -->
+        <text x="360" y="270" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#4338ca">SPINE — durable, owned by you</text>
+        <rect x="120" y="282" width="480" height="58" rx="12" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <g font-family="Inter" font-size="12.5" font-weight="600" fill="#4338ca" text-anchor="middle">
+          <text x="195" y="316">storage</text><text x="305" y="316">identity</text><text x="415" y="316">versioning</text><text x="540" y="316">audit trail</text>
+        </g>
+      </svg>
+      <figcaption><b>Many skins, one spine.</b> Fix the <em>data contract</em>; let the model generate the personalized <em>presentation</em> over it. The artifact is a disposable <em>view</em>; the record is the asset.</figcaption>
+    </figure>
+    <div class="callout key"><span class="ic">🔑</span><div class="body"><span class="t">The one principle to keep</span><p><b>Schema-first, presentation-generated.</b> Standardize what must be collected; personalize how it's asked. You get durable, comparable data <em>and</em> a bespoke experience — without choosing between them.</p></div></div>
+  </section>
+
+  <!-- 06 PERSISTENCE -->
+  <section id="persistence">
+    <h2 class="sec"><span class="num">06</span>"Saved as a document" — the 2026 reality</h2>
+    <p>The classic knock on artifacts was that they're throwaway: generated HTML has no backend, so nothing persists. In 2026 that gap is closing fast — persistence and distribution are being built into the platforms:</p>
+    <ul class="tight">
+      <li><b>Claude Artifacts</b> now have <b>persistent storage</b> (cross-session, ~20MB each), can be <b>shared to people without an account</b>, <b>remixed</b>, and can <b>call the model's API from inside the artifact</b>. "Live Artifacts" even refresh from connected data sources on reopen.</li>
+      <li><b>OpenAI Apps SDK + MCP Apps</b> — an open standard (Jan 2026) where a tool returns an <b>interactive UI component</b> that renders inline and works across ChatGPT, Claude, VS Code, and more. Build the experience once; it runs in many AI clients.</li>
+      <li><b>Generative-UI frameworks</b> (CopilotKit, assistant-ui, Google's A2UI) let you embed runtime-generated components inside <em>your own</em> product, not just a chat app.</li>
+    </ul>
+    <p>So a filled artifact can now behave like a <b>living document</b> — saved, versioned, re-openable, and updatable — rather than a one-shot throwaway. The capability you imagined already partly exists; the open question is <em>where the durable copy lives</em> (the spine).</p>
+  </section>
+
+  <!-- 07 B2B -->
+  <section id="b2b">
+    <h2 class="sec"><span class="num">07</span>Your B2B picture</h2>
+    <p>Your instinct — let your users generate a personalized questionnaire their client fills, saved as an updatable doc — is squarely where this is heading. Conceptually, the lifecycle looks like this:</p>
+    <figure>
+      <svg viewBox="0 0 720 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lifecycle: intent, generate, fill, structured data, living record">
+        <defs><marker id="af" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <g font-family="Inter" text-anchor="middle">
+          <rect x="14" y="40" width="116" height="48" rx="11" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+          <text x="72" y="61" font-size="12.5" font-weight="700" fill="#4338ca">Intent</text>
+          <text x="72" y="77" font-size="10.5" fill="#5b6478">"collect X from…"</text>
+          <rect x="160" y="40" width="116" height="48" rx="11" fill="#ede9fe" stroke="#cbb9fb" stroke-width="1.5"/>
+          <text x="218" y="61" font-size="12.5" font-weight="700" fill="#6d28d9">Generate</text>
+          <text x="218" y="77" font-size="10.5" fill="#5b6478">personalized artifact</text>
+          <rect x="306" y="40" width="116" height="48" rx="11" fill="#eff6ff" stroke="#bcd6fb" stroke-width="1.5"/>
+          <text x="364" y="61" font-size="12.5" font-weight="700" fill="#1d4ed8">Client fills</text>
+          <text x="364" y="77" font-size="10.5" fill="#5b6478">no account needed</text>
+          <rect x="452" y="40" width="116" height="48" rx="11" fill="#fff7ed" stroke="#fbd9a8" stroke-width="1.5"/>
+          <text x="510" y="61" font-size="12.5" font-weight="700" fill="#b45309">Structured</text>
+          <text x="510" y="77" font-size="10.5" fill="#5b6478">schema-validated</text>
+          <rect x="598" y="40" width="110" height="48" rx="11" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+          <text x="653" y="61" font-size="12.5" font-weight="700" fill="#047857">Living record</text>
+          <text x="653" y="77" font-size="10.5" fill="#5b6478">versioned</text>
+        </g>
+        <line x1="130" y1="64" x2="158" y2="64" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af)"/>
+        <line x1="276" y1="64" x2="304" y2="64" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af)"/>
+        <line x1="422" y1="64" x2="450" y2="64" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af)"/>
+        <line x1="568" y1="64" x2="596" y2="64" stroke="#9aa3b8" stroke-width="2" marker-end="url(#af)"/>
+        <path d="M653,90 q0,26 -289,26 -289,0 -289,-24" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#af)"/>
+        <text x="364" y="124" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#047857">re-open &amp; update — it stays alive</text>
+      </svg>
+      <figcaption>The artifact is the <em>experience</em>; your product is the <em>system of record</em> wrapped around it.</figcaption>
+    </figure>
+    <p><b>Where the real value lands:</b></p>
+    <ul class="tight">
+      <li><b>Long-tail forms become economical</b> — every client can get a bespoke questionnaire, not a generic one, at near-zero authoring cost.</li>
+      <li><b>Personalization lifts completion</b> — relevance and conversational framing measurably reduce drop-off.</li>
+      <li><b>Your moat isn't the generator</b> — anyone can generate HTML. It's the <b>spine</b>: the schema library, identity, storage, versioning, audit, and workflow your clients trust.</li>
+    </ul>
+    <div class="callout warn"><span class="ic">⚖️</span><div class="body"><span class="t">The B2B-specific tensions</span><p>Trust optics (a one-off generated page collecting sensitive data can look like phishing — branding &amp; provenance matter), accessibility, compliance/audit for regulated data, and consistency across regenerations. These are why the durable spine, not the pretty skin, is the product.</p></div></div>
+  </section>
+
+  <!-- 08 PROS CONS -->
+  <section id="proscons">
+    <h2 class="sec"><span class="num">08</span>Pros &amp; cons</h2>
+    <div class="two-col">
+      <div class="panel good">
+        <h4>✓ Why it's powerful</h4>
+        <ul>
+          <li><b>Personalized</b> per recipient &amp; context</li>
+          <li><b>Adaptive</b> — branches, pre-fills, follows up</li>
+          <li><b>Near-zero authoring</b> — describe, don't build</li>
+          <li><b>Higher completion</b> from relevance + conversation</li>
+          <li><b>Long-tail viable</b> — one-off forms finally pay off</li>
+          <li><b>Right modality</b> per question (widget vs chat)</li>
+        </ul>
+      </div>
+      <div class="panel bad">
+        <h4>✕ Where it bites</h4>
+        <ul>
+          <li><b>Non-deterministic</b> — output varies; needs schema lock</li>
+          <li><b>Field errors</b> — structured output isn't perfect</li>
+          <li><b>Ephemeral by default</b> — persistence needs a spine</li>
+          <li><b>Trust/phishing optics</b> for sensitive collection</li>
+          <li><b>Accessibility &amp; i18n</b> often weak in generated UI</li>
+          <li><b>Audit/compliance</b> harder when forms vary</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 DEEPER -->
+  <section id="deeper">
+    <h2 class="sec"><span class="num">09</span>The deeper shift: malleable software</h2>
+    <p>Forms are just the first domino. The real movement underneath is <b>malleable software</b> — the idea that people should reshape their tools <em>at runtime</em> instead of waiting for a vendor to ship an update (Geoffrey Litt &amp; Ink &amp; Switch; the 2025 "Malleable Software" essay, in the lineage of local-first computing).</p>
+    <p>Why now? End-user programming was always blocked by one wall: <b>turning a rough human idea into formal, working code.</b> LLMs are the missing key that removes it. Once anyone can say what they want and get working software, the unit of software stops being "the app a company ships" and becomes "the interface you generate for this moment."</p>
+    <div class="callout key"><span class="ic">🧭</span><div class="body"><span class="t">The mental flip</span><p>What's <b>durable</b> shifts from <b>screens</b> to <b>data + intent</b>. Interfaces become cheap, disposable, and personal; the lasting assets are your structured data and the stated intent that regenerates a view of it on demand.</p></div></div>
+    <p>Seen this way, "generate a client questionnaire" isn't a feature — it's an early instance of software becoming a <b>material you shape</b> rather than a <b>product you receive</b>.</p>
+  </section>
+
+  <!-- 10 THINK -->
+  <section id="think">
+    <h2 class="sec"><span class="num">10</span>How to think about it</h2>
+    <p>Not everything should be generated. Choose by what the task values most:</p>
+    <table class="t">
+      <thead><tr><th>Lean generated / adaptive when…</th><th>Keep static / schema-locked when…</th></tr></thead>
+      <tbody>
+        <tr><td>Discovery, onboarding, intake interviews</td><td>Regulated, legal, or high-stakes records</td></tr>
+        <tr><td>Inputs vary a lot by client/context</td><td>Everyone must answer the identical thing</td></tr>
+        <tr><td>Personalization lifts completion</td><td>Auditability &amp; exact reproducibility dominate</td></tr>
+        <tr><td>Long-tail, one-off questionnaires</td><td>The form itself is the document of record</td></tr>
+      </tbody>
+    </table>
+    <p>And the synthesis: it's rarely either/or. <b>Generate the experience; standardize the data.</b> Let the surface be as personal and adaptive as the moment deserves, while the contract underneath stays boring, fixed, and trustworthy.</p>
+  </section>
+
+  <div class="takeaways">
+    <h2>Takeaways</h2>
+    <ul>
+      <li><span class="tx">An HTML artifact is <b>disposable software generated at runtime</b> — the interface moves from build-time to on-demand.</span></li>
+      <li><span class="tx">Input-taking goes <b>one-for-all → one-for-one</b>: personalized, adaptive, described-not-authored.</span></li>
+      <li><span class="tx">The decisive principle: <b>schema-first, presentation-generated</b> — generated skin, durable spine.</span></li>
+      <li><span class="tx">Persistence is being solved (Artifacts storage, MCP Apps, gen-UI frameworks) — but <b>your product owns the system of record</b>, not the generator.</span></li>
+      <li><span class="tx">Underneath it all: <b>malleable software</b> — durability shifts from screens to <b>data + intent</b>.</span></li>
+    </ul>
+  </div>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><a href="https://www.geoffreylitt.com/2023/03/25/llm-end-user-programming.html">Geoffrey Litt — Malleable software in the age of LLMs</a> · <a href="https://simonwillison.net/2025/Jun/11/malleable-software/">Simon Willison's summary of the 2025 essay</a></li>
+      <li><a href="https://claude.com/blog/build-artifacts">Claude — Build AI-powered apps with Artifacts</a> (persistence, API, sharing)</li>
+      <li><a href="https://openai.com/index/introducing-apps-in-chatgpt/">OpenAI — Apps in ChatGPT &amp; the Apps SDK</a> · <a href="https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/">MCP Apps: UI components for MCP clients</a></li>
+      <li><a href="https://www.copilotkit.ai/blog/the-developer-s-guide-to-generative-ui-in-2026">CopilotKit — The developer's guide to generative UI (2026)</a> · <a href="https://cloud.google.com/discover/generative-ui">Google Cloud — What is generative UI</a></li>
+      <li><a href="https://generativeui.github.io/">Research — "LLMs are effective UI generators"</a> · <a href="https://arxiv.org/abs/2508.19227">"Generative Interfaces for Language Models"</a></li>
+      <li><a href="https://formless.ai./">Typeform Formless</a> — AI conversational forms (completion-rate claims)</li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Part of the <a href="../index.html">Learning</a> series · researched &amp; explained to be understood, not memorized.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+</script>
+</body>
+</html>
