@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Generative UI — Cut to the Signal — Learning</title>
+<meta name="description" content="What generative UI actually is (minus the hype), the one mental model worth having, the production pattern that separates it from slop, what the sharpest people argue, and what's actionable now vs ambitious later." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 800px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 860px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 660px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 800px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 54px 0 6px; line-height: 1.22; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin: 24px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.12rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .88em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.02rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .code-block { position: relative; margin: 18px 0; }
+  .code-block .cap { font-size: 12px; font-weight: 600; color: var(--faint); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1.62; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .c { color: #7e89a8; } .code-block .k { color: #79b8ff; } .code-block .s { color: #9fd0a0; } .code-block .n { color: #f6c177; }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout.tip { background: var(--tip-soft); border-color: #c7f0dd; } .callout.tip .t { color: #047857; }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14.5px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 12px 15px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+
+  /* voices */
+  .voices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+  @media (max-width: 640px) { .voices { grid-template-columns: 1fr; } }
+  .voice { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .voice .vh { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .voice .vn { font-weight: 800; font-size: 1rem; letter-spacing: -0.01em; }
+  .voice .vr { font-size: 11.5px; font-weight: 600; color: var(--primary-dark); background: var(--primary-soft); padding: 2px 8px; border-radius: 999px; }
+  .voice p { margin: 0; font-size: .95rem; color: #2b3142; line-height: 1.5; }
+  .voice .src { display: inline-block; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--primary-dark); text-decoration: none; }
+  .voice .src:hover { text-decoration: underline; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 5px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Generative UI</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🎛️ Interfaces · Generative UI</span>
+  <h1>Generative UI — Cut to the Signal</h1>
+  <p class="lede">The term is buried under hype and "top 10 tools" listicles. Strip those away and there's a real, specific idea with a real production pattern. Here's the meat: what it is, what the sharpest people argue, and what's actionable now vs ambitious later.</p>
+  <div class="meta-row">
+    <span>⏱️ ~12 min</span>
+    <span>📡 Signal only</span>
+    <span>🔎 Researched June 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#def">Definition — minus the hype</a></li>
+    <li><a href="#kinds">The three kinds (the model to keep)</a></li>
+    <li><a href="#principle">The principle that makes it work</a></li>
+    <li><a href="#voices">What the sharp people argue</a></li>
+    <li><a href="#now">Do now (near-term)</a></li>
+    <li><a href="#ambitious">The ambitious bet</a></li>
+    <li><a href="#caveats">Honest caveats</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 DEF -->
+  <section id="def">
+    <h2 class="sec"><span class="num">01</span>Definition — minus the hype</h2>
+    <p class="lead-in"><b>Generative UI</b> = the <em>interface itself</em> — not just the text — is assembled by a model <em>at runtime</em>, from your data and the user's context. The model decides which UI to show and how to configure it, per user, per turn.</p>
+    <p>Most of the noise comes from conflating three different things. Separate them and the hype collapses into something concrete:</p>
+    <table class="t">
+      <thead><tr><th>What people call "generative UI"</th><th>Actually is</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td>Figma AI, Galileo, design copilots</td><td>AI <b>design</b> — produces mockups for humans</td><td>Design time</td></tr>
+        <tr><td>v0, bolt, Lovable</td><td>AI <b>codegen</b> — produces code a human ships</td><td>Build time</td></tr>
+        <tr><td><b>Generative UI (proper)</b></td><td>The <b>running app</b> renders UI the model chose for this user/turn</td><td><b>Runtime</b></td></tr>
+      </tbody>
+    </table>
+    <p>All three are useful. Only the third is the new idea. This page is about that one.</p>
+  </section>
+
+  <!-- 02 KINDS -->
+  <section id="kinds">
+    <h2 class="sec"><span class="num">02</span>The three kinds — the one model to keep</h2>
+    <p>The most useful framing in circulation (popularized by CopilotKit) sorts runtime generative UI by <b>how much freedom the model gets</b>:</p>
+    <figure>
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The three kinds of generative UI on a reliability/flexibility spectrum">
+        <text x="40" y="26" font-family="Inter" font-size="12.5" font-weight="600" fill="#047857">← safer · predictable · testable</text>
+        <text x="680" y="26" text-anchor="end" font-family="Inter" font-size="12.5" font-weight="600" fill="#b45309">more flexible · less predictable →</text>
+        <!-- three boxes -->
+        <g font-family="Inter">
+          <rect x="40" y="42" width="200" height="96" rx="13" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+          <text x="140" y="68" text-anchor="middle" font-size="14" font-weight="800" fill="#047857">Static</text>
+          <text x="140" y="90" text-anchor="middle" font-size="11.5" fill="#3b6b57">model picks from a</text>
+          <text x="140" y="106" text-anchor="middle" font-size="11.5" fill="#3b6b57">fixed set of prebuilt</text>
+          <text x="140" y="122" text-anchor="middle" font-size="11.5" fill="#3b6b57">components</text>
+          <rect x="260" y="42" width="200" height="96" rx="13" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+          <text x="360" y="68" text-anchor="middle" font-size="14" font-weight="800" fill="#4338ca">Declarative</text>
+          <text x="360" y="90" text-anchor="middle" font-size="11.5" fill="#494b8a">model emits a schema;</text>
+          <text x="360" y="106" text-anchor="middle" font-size="11.5" fill="#494b8a">you compose vetted</text>
+          <text x="360" y="122" text-anchor="middle" font-size="11.5" fill="#494b8a">components</text>
+          <rect x="480" y="42" width="200" height="96" rx="13" fill="#fff7ed" stroke="#fbd9a8" stroke-width="1.5"/>
+          <text x="580" y="68" text-anchor="middle" font-size="14" font-weight="800" fill="#b45309">Fully generated</text>
+          <text x="580" y="90" text-anchor="middle" font-size="11.5" fill="#8a5a1f">model writes the UI</text>
+          <text x="580" y="106" text-anchor="middle" font-size="11.5" fill="#8a5a1f">code from scratch</text>
+          <text x="580" y="122" text-anchor="middle" font-size="11.5" fill="#8a5a1f">(v0-style)</text>
+        </g>
+        <!-- bracket production -->
+        <path d="M44,160 L44,172 L456,172 L456,160" fill="none" stroke="#10b981" stroke-width="2"/>
+        <text x="250" y="192" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#047857">where production lives today</text>
+        <path d="M484,160 L484,172 L676,172 L676,160" fill="none" stroke="#b45309" stroke-width="2"/>
+        <text x="580" y="192" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#b45309">build-time + human review</text>
+      </svg>
+      <figcaption>Reliability falls and flexibility rises left → right. <b>Ship static, graduate to declarative; keep fully-generated for build-time</b> (that's what v0 is).</figcaption>
+    </figure>
+  </section>
+
+  <!-- 03 PRINCIPLE -->
+  <section id="principle">
+    <h2 class="sec"><span class="num">03</span>The principle that makes it work</h2>
+    <p>Why most "generative UI" demos fall apart in production: they let the model emit <b>arbitrary code</b> — inconsistent, inaccessible, untestable "AI slop." The fix is the whole game:</p>
+    <div class="callout key"><span class="ic">🎯</span><div class="body"><span class="t">Constrain the model to choose &amp; configure, never to code</span><p>Express intent in natural language, but <b>compile it into a schema-validated composition over a fixed inventory of vetted components</b>. The model selects a component and fills its props; your code renders it. You keep consistency, accessibility, brand, and testability — and still get adaptivity.</p></div></div>
+    <p>Concretely, the model's output is data, not markup — a spec your renderer maps to real components:</p>
+    <div class="code-block">
+      <p class="cap">declarative UI spec — the model's output (illustrative)</p>
+      <pre><code>{
+  <span class="k">"component"</span>: <span class="s">"DataTable"</span>,        <span class="c">// chosen from your registry</span>
+  <span class="k">"props"</span>: {
+    <span class="k">"columns"</span>: [<span class="s">"vendor"</span>, <span class="s">"spend"</span>, <span class="s">"status"</span>],
+    <span class="k">"rows"</span>: <span class="s">"$.invoices"</span>,          <span class="c">// bound to your data, not invented</span>
+    <span class="k">"sortBy"</span>: <span class="s">"spend"</span>
+  },
+  <span class="k">"actions"</span>: [{ <span class="k">"label"</span>: <span class="s">"Approve"</span>, <span class="k">"intent"</span>: <span class="s">"approve_invoice"</span> }]
+}</code></pre>
+    </div>
+    <p style="font-size:.96rem;color:var(--muted)">Validate with JSON Schema / Zod; reject anything off-contract. This is the line between "adaptive product" and "unpredictable slop."</p>
+  </section>
+
+  <!-- 04 VOICES -->
+  <section id="voices">
+    <h2 class="sec"><span class="num">04</span>What the sharp people actually argue</h2>
+    <p>The signal, by who's carrying it — the essays and talks worth your time, not the listicles:</p>
+    <div class="voices">
+      <div class="voice">
+        <div class="vh"><span class="vn">Amelia Wattenberger</span><span class="vr">ex-GitHub Next</span></div>
+        <p>The cornerstone essay: chat is a bad interface — a blank textbox with <em>no affordances</em>. "Good tools make it clear how they should be used." Add controls, sliders, structure — don't make users type everything.</p>
+        <a class="src" href="https://wattenberger.com/thoughts/boo-chatbots/">"Why Chatbots Are Not the Future" ↗</a>
+      </div>
+      <div class="voice">
+        <div class="vh"><span class="vn">Linus Lee</span><span class="vr">Notion · thesephist</span></div>
+        <p>Stop forcing everything "through the narrow pipe of a text conversation." Let user and AI <b>manipulate a shared, spatial environment</b> together — interfaces, not transcripts.</p>
+        <a class="src" href="https://thesephist.com/posts/latent/">"Generative Interfaces Beyond Chat" ↗</a>
+      </div>
+      <div class="voice">
+        <div class="vh"><span class="vn">Guillermo Rauch</span><span class="vr">Vercel CEO</span></div>
+        <p>Coined "generative UI." Two products, two layers: <b>v0</b> (build-time codegen, 3M+ users) and the <b>AI SDK</b>, which streams rich UI from tool calls "to go beyond text-only Q&amp;A."</p>
+        <a class="src" href="https://vercel.com/blog/ai-sdk-3-generative-ui">Vercel — AI SDK 3.0 Generative UI ↗</a>
+      </div>
+      <div class="voice">
+        <div class="vh"><span class="vn">Andrej Karpathy</span><span class="vr">ex-Tesla / OpenAI</span></div>
+        <p>"Software 3.0": English is the new programming layer; software gets generated on demand. Pair it with an <b>"autonomy slider"</b> and keep the UI as how humans audit the AI.</p>
+        <a class="src" href="https://www.latent.space/p/s3">"Software Is Changing (Again)" ↗</a>
+      </div>
+      <div class="voice">
+        <div class="vh"><span class="vn">Geoffrey Litt</span><span class="vr">Notion · ex-Ink &amp; Switch</span></div>
+        <p>The ambitious end: <b>malleable software</b> — adaptation "at the point of use, not through engineering teams at distant corporations." LLMs make personal, reshapeable tools finally possible.</p>
+        <a class="src" href="https://www.geoffreylitt.com/2023/03/25/llm-end-user-programming.html">"Malleable software in the age of LLMs" ↗</a>
+      </div>
+      <div class="voice">
+        <div class="vh"><span class="vn">thesys (C1)</span><span class="vr">genUI pure-play</span></div>
+        <p>The commercial bet: a <b>"generative UI API"</b> that turns any LLM's output into live, stateful React components matching your design system — text out, interface out instead.</p>
+        <a class="src" href="https://www.thesys.dev/blogs/generative-ui-architecture">thesys — Building the first GenUI API ↗</a>
+      </div>
+    </div>
+    <p style="font-size:.96rem;color:var(--muted)">The throughline: <b>chat was a stopgap.</b> The interesting frontier is richer, manipulable interfaces co-driven by human and model — generated, but governed.</p>
+  </section>
+
+  <!-- 05 NOW -->
+  <section id="now">
+    <h2 class="sec"><span class="num">05</span>Do now — the near-term, actionable bits</h2>
+    <ul class="tight">
+      <li><b>Swap text for widgets where input is structured.</b> Dates → date picker, choices → buttons, results → table/chart/map. Wattenberger's affordances, applied. Highest signal-to-effort move.</li>
+      <li><b>Wire tool-calling to a component registry.</b> The model returns <em>which</em> component + props; you render vetted ones. Off-the-shelf: <b>Vercel AI SDK</b> (<code>streamUI</code>), <b>CopilotKit</b>, <b>thesys C1</b>, or <b>MCP Apps</b> for cross-client widgets.</li>
+      <li><b>Constrain + validate.</b> JSON Schema / Zod on every model-emitted spec; reject off-contract output. Start <b>static</b>, graduate to <b>declarative</b>.</li>
+      <li><b>Generate the arrangement, not the code.</b> Personalize <em>which</em> components show and how they're ordered per user/role/task — over a fixed component vocabulary.</li>
+      <li><b>Keep fully-generated UI at build-time.</b> Use v0/codegen with human review; don't ship raw model HTML to users.</li>
+    </ul>
+    <div class="callout tip"><span class="ic">⚡</span><div class="body"><span class="t">The 1-line strategy</span><p>Your design system becomes the model's <b>vocabulary</b>. The model composes; it never invents pixels.</p></div></div>
+  </section>
+
+  <!-- 06 AMBITIOUS -->
+  <section id="ambitious">
+    <h2 class="sec"><span class="num">06</span>The ambitious bet — where it's heading</h2>
+    <ul class="tight">
+      <li><b>Interface-for-one.</b> The app assembles itself per user, task, and context — no two sessions identical.</li>
+      <li><b>Malleable software</b> (Litt). Users reshape tools at the point of use; software becomes a <em>material</em>, not a shipped <em>product</em>.</li>
+      <li><b>Post-chat</b> (Wattenberger, Lee). Rich, spatial, manipulable canvases co-driven by human + model replace the transcript.</li>
+      <li><b>Software 3.0</b> (Karpathy). Natural language is the programming layer; the durable asset shifts from <b>screens → data + intent</b>.</li>
+      <li><b>The long tail unlocks.</b> Interfaces nobody could afford to hand-build — one-off, niche, per-customer — become generatable on demand.</li>
+    </ul>
+  </section>
+
+  <!-- 07 CAVEATS -->
+  <section id="caveats">
+    <h2 class="sec"><span class="num">07</span>Honest caveats — what the same people flag</h2>
+    <ul class="tight">
+      <li><b>Non-determinism.</b> Same prompt → different layouts; hard to test, review, govern. (The constraint pattern is the antidote.)</li>
+      <li><b>Discoverability / muscle memory.</b> A UI that changes every time can't be learned. Stability is a feature; don't regenerate what users rely on.</li>
+      <li><b>Accessibility.</b> Generated UI routinely skips a11y — it's a lagging afterthought in most of the hype. Bake it into the component library, not the prompt.</li>
+      <li><b>Latency, cost, trust.</b> Every rendered turn is a model call; budget and cache accordingly.</li>
+      <li><b>It's a collaborator, not a replacement.</b> Humans still set the vocabulary, guardrails, and taste. The model arranges within them.</li>
+    </ul>
+  </section>
+
+  <div class="takeaways">
+    <h2>Takeaways</h2>
+    <ul>
+      <li><span class="tx"><b>Generative UI (proper) = runtime</b> — the app renders model-chosen UI per user/turn. Not Figma-AI, not v0.</span></li>
+      <li><span class="tx">Keep one model: <b>static → declarative → fully-generated.</b> Production lives in the first two.</span></li>
+      <li><span class="tx">The whole game: <b>model selects &amp; configures vetted components, schema-validated</b> — never emits raw code.</span></li>
+      <li><span class="tx">The thesis (Wattenberger, Lee, Litt, Karpathy): <b>chat was a stopgap</b>; the future is rich, governed, generated interfaces.</span></li>
+      <li><span class="tx">Now: <b>widgets over text, design system as the model's vocabulary.</b> Later: interface-for-one, malleable software.</span></li>
+    </ul>
+  </div>
+
+  <p style="text-align:center;margin-top:34px;color:var(--muted)">Companion reading: <a href="html-artifacts.html" style="color:var(--primary-dark);font-weight:600">HTML Artifacts &amp; the End of the Static Form</a> — the same shift, seen through data collection.</p>
+
+  <div class="sources" id="sources">
+    <h3>Primary sources — the signal</h3>
+    <ul>
+      <li><b>Essays:</b> <a href="https://wattenberger.com/thoughts/boo-chatbots/">Wattenberger — Why Chatbots Are Not the Future</a> · <a href="https://thesephist.com/posts/latent/">Linus Lee — Imagining better interfaces to LLMs</a> · <a href="https://www.geoffreylitt.com/2023/03/25/llm-end-user-programming.html">Litt — Malleable software in the age of LLMs</a></li>
+      <li><b>Talks:</b> <a href="https://www.latent.space/p/s3">Karpathy — Software 3.0 ("Software Is Changing Again")</a> · <a href="https://www.youtube.com/watch?v=rd-J3hmycQs">Lee — Generative Interfaces Beyond Chat</a></li>
+      <li><b>Builders/blogs:</b> <a href="https://vercel.com/blog/ai-sdk-3-generative-ui">Vercel — AI SDK 3.0 Generative UI</a> · <a href="https://www.thesys.dev/blogs/generative-ui-architecture">thesys — Building the first GenUI API</a> · <a href="https://www.copilotkit.ai/blog/the-three-kinds-of-generative-ui">CopilotKit — The three kinds of generative UI</a></li>
+      <li><b>The reliability case:</b> <a href="https://puckeditor.com/blog/ai-slop-vs-constrained-ui">Puck — AI Slop vs Constrained UI</a> · <a href="https://generativeui.github.io/">Google research — LLMs are effective UI generators</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Part of the <a href="../index.html">Learning</a> series · researched &amp; explained to be understood, not memorized.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button'); btn.style.cssText='position:absolute;top:30px;right:10px;background:rgba(255,255,255,.08);color:#cdd3e6;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;opacity:0;transition:opacity .15s';
+    btn.textContent='Copy';
+    block.addEventListener('mouseenter',function(){btn.style.opacity='1';});
+    block.addEventListener('mouseleave',function(){btn.style.opacity='0';});
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(block.querySelector('code').innerText).then(function () {
+        btn.textContent='Copied!'; setTimeout(function(){btn.textContent='Copy';},1500);
+      });
+    });
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>
