@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MCP, End to End — Learning</title>
+<meta name="description" content="How the Model Context Protocol actually works — architecture, the primitives and control model, auth (OAuth 2.1), server composition via gateways, the two-sided B2B play, security failure modes, pros and cons — comprehensive but concise." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 800px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 870px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 670px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 800px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin: 52px 0 6px; line-height: 1.24; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.08rem; font-weight: 700; margin: 22px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.1rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .86em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.0rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .code-block { position: relative; margin: 16px 0; }
+  .code-block .cap { font-size: 12px; font-weight: 600; color: var(--faint); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 12.5px; line-height: 1.6; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .c { color: #7e89a8; } .code-block .k { color: #79b8ff; } .code-block .s { color: #9fd0a0; } .code-block .n { color: #f6c177; }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 11px 14px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+  table.t .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--primary-dark); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .panel h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .panel.good h4 { color: #047857; } .panel.bad h4 { color: #b91c1c; }
+  .panel ul { margin: 0; padding-left: 0; list-style: none; }
+  .panel li { padding-left: 22px; position: relative; margin: 8px 0; font-size: .94rem; color: #2b3142; }
+  .panel.good li::before { content: "✓"; position: absolute; left: 0; color: #10b981; font-weight: 700; }
+  .panel.bad li::before { content: "✕"; position: absolute; left: 0; color: #ef4444; font-weight: 700; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 6px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>MCP, End to End</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🔌 Protocols · MCP</span>
+  <h1>MCP, End to End</h1>
+  <p class="lede">Past "it's USB-C for AI." How the Model Context Protocol actually works on the wire, how integrations and auth really function, how to compose many servers, and the two-sided strategic play for a B2B SaaS — comprehensive, but tight.</p>
+  <div class="meta-row">
+    <span>⏱️ ~14 min</span>
+    <span>🏢 B2B / architectural</span>
+    <span>🔎 Latest — 2026 spec</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#frame">The model in one frame</a></li>
+    <li><a href="#primitives">Primitives &amp; the control model</a></li>
+    <li><a href="#flow">How an integration actually runs</a></li>
+    <li><a href="#auth">Auth — the B2B-critical part</a></li>
+    <li><a href="#compose">Composing servers (the gateway)</a></li>
+    <li><a href="#twosided">The two-sided B2B play</a></li>
+    <li><a href="#security">Security failure modes</a></li>
+    <li><a href="#proscons">Limits, pros &amp; cons</a></li>
+    <li><a href="#neighbors">MCP vs the neighbors</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 -->
+  <section id="frame">
+    <h2 class="sec"><span class="num">01</span>The model in one frame</h2>
+    <p class="lead-in">MCP is a <b>capability-negotiating RPC</b> (JSON-RPC 2.0) between an AI <b>host</b> and external <b>servers</b>. The host runs one <b>client</b> per server; each client holds a 1:1 session. The value isn't any single tool — it's the standardized <em>shape</em>: any MCP client can talk to any MCP server, so integrations stop being bespoke.</p>
+    <figure>
+      <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MCP architecture: host with clients connecting to servers">
+        <rect x="24" y="60" width="240" height="200" rx="14" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="144" y="86" text-anchor="middle" font-family="Inter" font-size="14" font-weight="800" fill="#4338ca">Host (AI app)</text>
+        <rect x="86" y="100" width="116" height="34" rx="8" fill="#ddd6fe"/><text x="144" y="122" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#5b21b6">LLM</text>
+        <g font-family="Inter" font-size="11.5" font-weight="600" fill="#4338ca">
+          <rect x="56" y="156" width="176" height="28" rx="7" fill="#fff" stroke="#cdd0f5"/><text x="144" y="174" text-anchor="middle">MCP client #1</text>
+          <rect x="56" y="190" width="176" height="28" rx="7" fill="#fff" stroke="#cdd0f5"/><text x="144" y="208" text-anchor="middle">MCP client #2</text>
+          <rect x="56" y="224" width="176" height="28" rx="7" fill="#fff" stroke="#cdd0f5"/><text x="144" y="242" text-anchor="middle">MCP client #3</text>
+        </g>
+        <!-- servers -->
+        <g font-family="Inter">
+          <rect x="470" y="84" width="226" height="48" rx="11" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+          <text x="486" y="104" font-size="12.5" font-weight="700" fill="#047857">Local server</text>
+          <text x="486" y="121" font-size="10.5" fill="#5b6478">stdio · files, shell</text>
+          <rect x="470" y="142" width="226" height="48" rx="11" fill="#eff6ff" stroke="#bcd6fb" stroke-width="1.5"/>
+          <text x="486" y="162" font-size="12.5" font-weight="700" fill="#1d4ed8">Remote server</text>
+          <text x="486" y="179" font-size="10.5" fill="#5b6478">Streamable HTTP · SaaS API</text>
+          <rect x="470" y="200" width="226" height="48" rx="11" fill="#fff7ed" stroke="#fbd9a8" stroke-width="1.5"/>
+          <text x="486" y="220" font-size="12.5" font-weight="700" fill="#b45309">Your SaaS server</text>
+          <text x="486" y="237" font-size="10.5" fill="#5b6478">exposes Tools · Resources · Prompts</text>
+        </g>
+        <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <line x1="232" y1="170" x2="468" y2="108" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <line x1="232" y1="204" x2="468" y2="166" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <line x1="232" y1="238" x2="468" y2="224" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <text x="350" y="135" text-anchor="middle" font-family="Inter" font-size="10.5" font-style="italic" fill="#8a93a6">JSON-RPC 2.0 · 1 client : 1 server</text>
+        <text x="350" y="285" text-anchor="middle" font-family="Inter" font-size="11" fill="#5b6478">back-channel (client → host): Sampling · Elicitation · Roots</text>
+      </svg>
+      <figcaption>Two transports only: <b>stdio</b> (local) and <b>Streamable HTTP</b> (remote — it replaced SSE; servers can now sit behind an ordinary load balancer, stateless).</figcaption>
+    </figure>
+  </section>
+
+  <!-- 02 -->
+  <section id="primitives">
+    <h2 class="sec"><span class="num">02</span>Primitives &amp; the control model</h2>
+    <p>The non-surface point: MCP's design is really a <b>control model</b> — each primitive answers "<em>who</em> decides this runs?" That's what makes it safe(ish) to give a model real capabilities.</p>
+    <table class="t">
+      <thead><tr><th>Primitive</th><th>Exposed by</th><th>Controlled by</th><th>Is</th></tr></thead>
+      <tbody>
+        <tr><td>Tools</td><td>Server</td><td><b>Model</b></td><td>Actions the model may call (<span class="mono">tools/call</span>)</td></tr>
+        <tr><td>Resources</td><td>Server</td><td>App / user</td><td>Read-only context the host attaches (files, records)</td></tr>
+        <tr><td>Prompts</td><td>Server</td><td>User</td><td>Pre-built templates / workflows the user invokes</td></tr>
+        <tr><td>Sampling</td><td>Client</td><td>Host</td><td>Server asks the <em>host's</em> LLM to complete — no own API key</td></tr>
+        <tr><td>Elicitation</td><td>Client</td><td>User</td><td>Server asks the user for input mid-run (human-in-the-loop)</td></tr>
+        <tr><td>Roots</td><td>Client</td><td>App</td><td>Boundaries — which paths/URLs a server may touch</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note"><span class="ic">🔁</span><div class="body"><span class="t">The under-appreciated one</span><p><b>Sampling</b> reverses the arrow: the server borrows the host's model. It enables "agentic" servers without their own keys — and is a real security surface, because a server can now drive inference.</p></div></div>
+  </section>
+
+  <!-- 03 -->
+  <section id="flow">
+    <h2 class="sec"><span class="num">03</span>How an integration actually runs</h2>
+    <p>The lifecycle is short: <b>initialize</b> (negotiate capabilities &amp; version) → <b>discover</b> (<span class="mono">tools/list</span>, cacheable per <code>ttlMs</code>) → <b>invoke</b> (<span class="mono">tools/call</span>) → results back to the model. On the wire it's plain JSON-RPC:</p>
+    <div class="code-block">
+      <p class="cap">tools/call — request &amp; result</p>
+      <pre><code><span class="c">// host → server</span>
+{ <span class="k">"jsonrpc"</span>:<span class="s">"2.0"</span>, <span class="k">"id"</span>:<span class="n">7</span>, <span class="k">"method"</span>:<span class="s">"tools/call"</span>,
+  <span class="k">"params"</span>:{ <span class="k">"name"</span>:<span class="s">"get_invoice"</span>, <span class="k">"arguments"</span>:{ <span class="k">"id"</span>:<span class="s">"inv_88"</span> } } }
+
+<span class="c">// server → host  (content is returned to the MODEL as context)</span>
+{ <span class="k">"jsonrpc"</span>:<span class="s">"2.0"</span>, <span class="k">"id"</span>:<span class="n">7</span>,
+  <span class="k">"result"</span>:{ <span class="k">"content"</span>:[{ <span class="k">"type"</span>:<span class="s">"text"</span>, <span class="k">"text"</span>:<span class="s">"{ amount: 4200, status: 'due' }"</span> }] } }</code></pre>
+    </div>
+    <p>Note the last line: tool <em>output</em> flows straight into the model's context. <b>Treat it as untrusted input</b> — that's the root of MCP's security story (§07).</p>
+  </section>
+
+  <!-- 04 -->
+  <section id="auth">
+    <h2 class="sec"><span class="num">04</span>Auth — the B2B-critical part</h2>
+    <p>MCP deliberately <b>doesn't invent auth</b> — that's why it's enterprise-viable. A remote server is an <b>OAuth 2.1 Resource Server</b>. It advertises its authorization server via a <code>.well-known/oauth-protected-resource</code> document; the client gets a token from <em>your</em> IdP (Okta, Entra, Auth0) and calls the server with it.</p>
+    <ul class="tight">
+      <li><b>Audience-bound tokens</b> (RFC 8707 Resource Indicators) — a token minted for server A can't be replayed against server B.</li>
+      <li><b>Dynamic client registration</b> so clients you didn't pre-provision can still onboard.</li>
+      <li><b>Per-tenant, narrowly-scoped tokens</b> — one customer's agent can never reach another's data.</li>
+    </ul>
+    <div class="callout key"><span class="ic">🔑</span><div class="body"><span class="t">The takeaway</span><p>MCP rides OAuth/OIDC, so you reuse your existing IdP and authorization model. Scope tightly and bind audience — broad tokens are the #1 enterprise MCP footgun.</p></div></div>
+  </section>
+
+  <!-- 05 -->
+  <section id="compose">
+    <h2 class="sec"><span class="num">05</span>Composing servers — how you "stack" them</h2>
+    <p>Base MCP has no server-to-server calls: it's 1 client : 1 server, and the host fans out. To combine many servers — and to make that safe in production — you put a <b>gateway</b> in front.</p>
+    <figure>
+      <svg viewBox="0 0 720 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MCP gateway aggregating multiple servers">
+        <rect x="24" y="100" width="150" height="64" rx="12" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="99" y="128" text-anchor="middle" font-family="Inter" font-size="13" font-weight="800" fill="#4338ca">Agent / Host</text>
+        <text x="99" y="146" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">one endpoint</text>
+        <rect x="248" y="64" width="200" height="136" rx="13" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="2"/>
+        <text x="348" y="90" text-anchor="middle" font-family="Inter" font-size="13.5" font-weight="800" fill="#6d28d9">MCP Gateway</text>
+        <g font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6" text-anchor="middle">
+          <text x="348" y="112">auth (OAuth 2.1 / OIDC)</text>
+          <text x="348" y="131">RBAC tool allow / deny</text>
+          <text x="348" y="150">audit log · observability</text>
+          <text x="348" y="169">routing · transport bridge</text>
+        </g>
+        <g font-family="Inter" font-size="11.5" font-weight="600">
+          <rect x="540" y="50" width="150" height="34" rx="8" fill="#ecfdf5" stroke="#a8e6c8"/><text x="615" y="72" text-anchor="middle" fill="#047857">GitHub</text>
+          <rect x="540" y="92" width="150" height="34" rx="8" fill="#eff6ff" stroke="#bcd6fb"/><text x="615" y="114" text-anchor="middle" fill="#1d4ed8">Postgres</text>
+          <rect x="540" y="134" width="150" height="34" rx="8" fill="#fff7ed" stroke="#fbd9a8"/><text x="615" y="156" text-anchor="middle" fill="#b45309">Your SaaS</text>
+          <rect x="540" y="176" width="150" height="34" rx="8" fill="#f1f1f6" stroke="#d8dae6"/><text x="615" y="198" text-anchor="middle" fill="#3b3f55">Slack</text>
+        </g>
+        <defs><marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <line x1="174" y1="132" x2="246" y2="132" stroke="#9aa3b8" stroke-width="2.5" marker-end="url(#b)"/>
+        <line x1="448" y1="100" x2="538" y2="68" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+        <line x1="448" y1="120" x2="538" y2="109" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+        <line x1="448" y1="142" x2="538" y2="151" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+        <line x1="448" y1="162" x2="538" y2="193" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+      </svg>
+      <figcaption>A gateway aggregates N servers behind one endpoint and becomes the control plane: auth, tool-level RBAC, audit, routing. (agentgateway/LF, Kong, Cloudflare Portals, IBM ContextForge, Composio, Microsoft MCP Gateway.) Discovery is handled by the official <b>MCP Registry</b> plus private/federated registries.</figcaption>
+    </figure>
+    <p>Other composition moves: a <b>proxy server</b> (a server that is itself a client, wrapping another) and <b>private registries</b> that expose only org-approved servers.</p>
+  </section>
+
+  <!-- 06 -->
+  <section id="twosided">
+    <h2 class="sec"><span class="num">06</span>The two-sided B2B play</h2>
+    <p>For a SaaS, MCP is two distinct moves — and the second is the strategic one:</p>
+    <table class="t">
+      <thead><tr><th></th><th>Consume</th><th>Expose</th></tr></thead>
+      <tbody>
+        <tr><td>You build</td><td>An MCP <b>client</b> in your agent</td><td>An MCP <b>server</b> for your product</td></tr>
+        <tr><td>You get</td><td>Instant tool/data integrations — stop writing bespoke connectors</td><td>Any agent (ChatGPT, Claude, Cursor, Copilot) can use your SaaS as a tool</td></tr>
+        <tr><td>The point</td><td>Build the agent faster</td><td><b>Distribution</b> — be callable inside the AI surfaces your customers already live in</td></tr>
+        <tr><td>Watch out</td><td>Tool bloat &amp; untrusted output</td><td>UI <b>disintermediation</b> — agents bypass your app; your moat shifts to data &amp; actions</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note"><span class="ic">📣</span><div class="body"><span class="t">The strategic read</span><p>Shipping an MCP server is the new public API — except the "developer" integrating you is an autonomous agent. It's a distribution channel and a disintermediation risk at once. <a href="html-artifacts.html">MCP Apps</a> let your server return interactive UI, clawing some of that surface back.</p></div></div>
+  </section>
+
+  <!-- 07 -->
+  <section id="security">
+    <h2 class="sec"><span class="num">07</span>Security failure modes (MCP barely specifies security)</h2>
+    <p>The protocol standardized auth only recently and still leaves most security to you. The notable classes:</p>
+    <ul class="tight">
+      <li><b>Tool poisoning</b> — malicious instructions hidden in a tool's <em>description</em>; the model reads descriptions as guidance, so what it executes ≠ what you think the tool does.</li>
+      <li><b>Rug pulls</b> — a server changes its tool definitions <em>after</em> you approved them. Safe on day 1, exfiltrating keys on day 7. Trust-on-first-use is not enough.</li>
+      <li><b>Confused deputy / cross-server shadowing</b> — one server's tool description manipulates the agent into misusing <em>another</em> connected server's powerful tools.</li>
+      <li><b>Injection via tool results</b> — untrusted data returned by a tool hijacks the agent (the <a href="browser-agents.html">lethal trifecta</a>: private data + untrusted content + exfiltration).</li>
+      <li><b>Token theft &amp; over-broad scopes</b> — the classic OAuth failure, amplified because an agent wields the token autonomously.</li>
+    </ul>
+    <div class="callout warn"><span class="ic">🛡️</span><div class="body"><span class="t">Mitigations that matter</span><p>Pin &amp; diff tool definitions (catch rug pulls); vet/sign servers; narrow, audience-bound, per-tenant tokens; a gateway with allow-lists + policy + <a href="sealing-artifacts.html">audit</a>; human approval for high-impact tools; and treat <b>every</b> tool output as untrusted. See the OWASP MCP cheat sheet.</p></div></div>
+  </section>
+
+  <!-- 08 -->
+  <section id="proscons">
+    <h2 class="sec"><span class="num">08</span>Limits, pros &amp; cons</h2>
+    <div class="two-col">
+      <div class="panel good">
+        <h4>✓ Pros</h4>
+        <ul>
+          <li><b>Write once, work everywhere</b> — one server, every MCP client</li>
+          <li>Standard <b>auth</b> (OAuth/OIDC — reuse your IdP)</li>
+          <li><b>Dynamic discovery</b> — tools appear without redeploys</li>
+          <li>Decouples tools from the model &amp; the app</li>
+          <li><b>De-facto standard</b> — Anthropic, OpenAI, Google, Microsoft, AWS</li>
+          <li>Turns your SaaS into an <b>agent-callable surface</b></li>
+        </ul>
+      </div>
+      <div class="panel bad">
+        <h4>✕ Cons / limits</h4>
+        <ul>
+          <li><b>Security is largely your job</b> (poisoning, rug pulls, injection)</li>
+          <li><b>Tool bloat</b> — too many tools degrade model selection</li>
+          <li>It's <b>plumbing, not orchestration</b> — no agent logic, no planning</li>
+          <li>Versioning &amp; discovery still <b>maturing</b>; spec moves fast</li>
+          <li>Stateful sessions vs scale; extra latency per hop</li>
+          <li>UI <b>disintermediation</b> risk once you expose</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 -->
+  <section id="neighbors">
+    <h2 class="sec"><span class="num">09</span>MCP vs the neighbors</h2>
+    <ul class="tight">
+      <li><b>vs function calling / OpenAPI plugins:</b> those are per-app and ad-hoc. MCP standardizes the <em>shape</em> + discovery + transport + auth, so an integration is reusable across every client.</li>
+      <li><b>vs A2A (Agent2Agent):</b> complementary, not rival. <b>MCP = agent ↔ tools/data</b> (vertical); <b>A2A = agent ↔ agent</b> (horizontal, delegation between peers). A serious system uses both.</li>
+      <li><b>MCP Apps / OpenAI Apps SDK:</b> built <em>on</em> MCP, adding interactive UI returned by tools (see <a href="generative-ui.html">Generative UI</a>).</li>
+    </ul>
+    <div class="callout key"><span class="ic">🏛️</span><div class="body"><span class="t">For a regulated SaaS (e.g. financial advisory)</span><p>Front everything with a gateway (auth · allow-lists · audit), pin tool defs, scope tokens per-tenant, treat tool output as untrusted, log every call for recordkeeping, and gate money/advice behind human approval. MCP delivers the <em>integration</em>; your <a href="software-3-finance.html">compliance spine</a> governs it.</p></div></div>
+  </section>
+
+  <div class="takeaways">
+    <h2>The comprehensive-but-short version</h2>
+    <ul>
+      <li><span class="tx">MCP = <b>JSON-RPC capability negotiation</b>; host runs 1 client per server; transports are <b>stdio</b> &amp; <b>Streamable HTTP</b>.</span></li>
+      <li><span class="tx">The primitives encode a <b>control model</b> (model/user/app decides) — Tools, Resources, Prompts, Sampling, Elicitation, Roots.</span></li>
+      <li><span class="tx">Auth is <b>OAuth 2.1, server-as-resource-server</b> — reuse your IdP; scope &amp; audience-bind tokens.</span></li>
+      <li><span class="tx">Compose many servers with a <b>gateway</b> (auth · RBAC · audit · routing) — base MCP has no server-to-server.</span></li>
+      <li><span class="tx">For B2B: <b>consume</b> for speed, <b>expose</b> for distribution — exposing is the strategic, and risky, move.</span></li>
+      <li><span class="tx">It barely specifies security: <b>poisoning, rug pulls, injection</b> are yours to defend. Plumbing, not orchestration.</span></li>
+    </ul>
+  </div>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><b>Spec &amp; latest:</b> <a href="https://modelcontextprotocol.io/specification">modelcontextprotocol.io — specification</a> · <a href="https://blog.modelcontextprotocol.io/">the 2026 revision (stateless core, Tasks, OAuth alignment)</a></li>
+      <li><b>Auth:</b> <a href="https://stackoverflow.blog/2026/01/21/is-that-allowed-authentication-and-authorization-in-model-context-protocol/">Authn/authz in MCP (Stack Overflow)</a></li>
+      <li><b>Composition:</b> <a href="https://composio.dev/content/what-is-mcp-gateway-and-why-your-enterprise-need-it">What is an MCP gateway (Composio)</a> · <a href="https://www.heyitworks.tech/blog/mcp-aggregation-gateway-proxy-tools-q1-2026">Gateway/aggregator ecosystem, Q1 2026</a></li>
+      <li><b>Security:</b> <a href="https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html">OWASP MCP Security Cheat Sheet</a> · <a href="https://simonwillison.net/2025/Apr/9/mcp-prompt-injection/">Simon Willison — MCP prompt injection</a> · <a href="https://pipelab.org/blog/state-of-mcp-security-2026/">State of MCP security 2026</a></li>
+      <li><b>Landscape:</b> <a href="https://www.solo.io/blog/deep-dive-mcp-and-a2a-attack-vectors-for-ai-agents">MCP vs A2A attack vectors (Solo.io)</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  All the content on this page is AI generated.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button'); btn.style.cssText='position:absolute;top:30px;right:10px;background:rgba(255,255,255,.08);color:#cdd3e6;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;opacity:0;transition:opacity .15s';
+    btn.textContent='Copy';
+    block.addEventListener('mouseenter',function(){btn.style.opacity='1';});
+    block.addEventListener('mouseleave',function(){btn.style.opacity='0';});
+    btn.addEventListener('click',function(){navigator.clipboard.writeText(block.querySelector('code').innerText).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy';},1500);});});
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>
