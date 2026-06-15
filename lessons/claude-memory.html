@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Claude's Memory Store — Learning</title>
+<meta name="description" content="How Claude's memory actually works — the client-side memory tool vs server-side memory in Managed Agents, context editing, the wire-level loop, memory poisoning, and the regulated-SaaS decision. Concise and current." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 800px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 870px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 680px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 800px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin: 52px 0 6px; line-height: 1.24; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.08rem; font-weight: 700; margin: 22px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.1rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .85em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.0rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .code-block { position: relative; margin: 16px 0; }
+  .code-block .cap { font-size: 12px; font-weight: 600; color: var(--faint); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 12.5px; line-height: 1.6; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .c { color: #7e89a8; } .code-block .k { color: #79b8ff; } .code-block .s { color: #9fd0a0; } .code-block .n { color: #f6c177; }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout.danger { background: var(--danger-soft); border-color: #fbd2d2; } .callout.danger .t { color: #b91c1c; }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 14px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 11px 14px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+  table.t .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--primary-dark); }
+  table.t .yes { color: #047857; font-weight: 600; } table.t .no { color: #b91c1c; font-weight: 600; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 6px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Claude's Memory Store</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">🧠 Claude · Memory</span>
+  <h1>Claude's Memory Store</h1>
+  <p class="lede">A model has no memory between calls — the context window is amnesia. "Memory" is an external store the agent reads and writes. Here's how that actually works: the client-side memory tool, the server-side store inside a <b>Managed Agent</b>, and which to pick.</p>
+  <div class="meta-row">
+    <span>⏱️ ~11 min</span>
+    <span>🏢 API / agent architecture</span>
+    <span>🔎 Latest — beta, June 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#two">Two memory models</a></li>
+    <li><a href="#tool">The memory tool, on the wire</a></li>
+    <li><a href="#context">Context editing — the other half</a></li>
+    <li><a href="#managed">Memory in a Managed Agent</a></li>
+    <li><a href="#choose">DIY vs Managed — which</a></li>
+    <li><a href="#confuse">The four "memories," disambiguated</a></li>
+    <li><a href="#risk">Limits &amp; memory poisoning</a></li>
+    <li><a href="#regulated">For a regulated SaaS</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 -->
+  <section id="two">
+    <h2 class="sec"><span class="num">01</span>Two memory models</h2>
+    <p class="lead-in">Claude doesn't "remember" — each API call starts cold. Memory is just a <b>store of files the agent reads at the start of a task and writes as it learns.</b> Anthropic ships this two ways, and they differ on the one question that matters: <b>who holds the data.</b></p>
+    <table class="t">
+      <thead><tr><th></th><th>Client-side memory tool</th><th>Managed Agent memory</th></tr></thead>
+      <tbody>
+        <tr><td>The loop runs</td><td>In <b>your</b> backend (Messages API)</td><td>In <b>Anthropic's</b> infrastructure</td></tr>
+        <tr><td>Memory is stored</td><td>In <b>your</b> storage (FS / S3 / DB)</td><td><b>Server-side</b>, by Anthropic</td></tr>
+        <tr><td>Versioning &amp; audit</td><td>You build it</td><td><b>Built in</b> (immutable versions, audit)</td></tr>
+      </tbody>
+    </table>
+    <p>Both are in <b>beta</b> (June 2026). The rest of this is how each works — and why a regulated B2B SaaS usually wants the first.</p>
+  </section>
+
+  <!-- 02 -->
+  <section id="tool">
+    <h2 class="sec"><span class="num">02</span>The memory tool, on the wire</h2>
+    <p>The client-side memory tool (<span class="mono">memory_20250818</span>) is just a tool Claude can call, scoped to a <code>/memories</code> directory. The twist: <b>Anthropic doesn't execute it — you do.</b> Claude emits the command; your app runs it against your storage and returns the result. Anthropic never sees the files, only the command log.</p>
+    <figure>
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The client-side memory tool loop">
+        <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <rect x="30" y="78" width="150" height="64" rx="13" fill="#ede9fe" stroke="#cbb9fb" stroke-width="1.5"/>
+        <text x="105" y="106" text-anchor="middle" font-family="Inter" font-size="13.5" font-weight="800" fill="#6d28d9">Claude</text>
+        <text x="105" y="124" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">(Anthropic API)</text>
+        <rect x="285" y="78" width="160" height="64" rx="13" fill="#eef0ff" stroke="#c7c2ff" stroke-width="2"/>
+        <text x="365" y="103" text-anchor="middle" font-family="Inter" font-size="13.5" font-weight="800" fill="#4338ca">Your app</text>
+        <text x="365" y="122" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">executes the command</text>
+        <rect x="556" y="74" width="140" height="72" rx="12" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+        <text x="626" y="100" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#047857">Your storage</text>
+        <text x="626" y="118" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">/memories</text>
+        <text x="626" y="132" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">FS · S3 · DB</text>
+        <path d="M180,98 L283,98" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <text x="232" y="90" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b6478">tool_use</text>
+        <path d="M283,124 L182,124" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <text x="232" y="138" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b6478">tool_result</text>
+        <path d="M445,98 L554,98" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <path d="M554,124 L447,124" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <text x="500" y="90" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b6478">read / write</text>
+        <text x="360" y="184" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#b45309">Anthropic never sees the files — only the command log.</text>
+      </svg>
+      <figcaption>Six commands on <code>/memories</code>: <b>view · create · str_replace · insert · delete · rename</b>. Claude is instructed to <code>view</code> its memory before starting a task. You implement the handler (and path-traversal protection).</figcaption>
+    </figure>
+    <div class="code-block">
+      <p class="cap">one turn of the loop</p>
+      <pre><code><span class="c">// Claude → your app</span>
+{ <span class="k">"type"</span>:<span class="s">"tool_use"</span>, <span class="k">"name"</span>:<span class="s">"memory"</span>, <span class="k">"input"</span>:{
+    <span class="k">"command"</span>:<span class="s">"str_replace"</span>, <span class="k">"path"</span>:<span class="s">"/memories/client_88.md"</span>,
+    <span class="k">"old_str"</span>:<span class="s">"risk: medium"</span>, <span class="k">"new_str"</span>:<span class="s">"risk: high"</span> } }
+
+<span class="c">// your app writes to YOUR storage, returns →</span>
+{ <span class="k">"type"</span>:<span class="s">"tool_result"</span>, <span class="k">"content"</span>:<span class="s">"Edited /memories/client_88.md"</span> }</code></pre>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section id="context">
+    <h2 class="sec"><span class="num">03</span>Context editing — the other half</h2>
+    <p>Memory only matters because the context window fills. Its partner feature, <b>context editing</b> (<span class="mono">clear_tool_uses_20250919</span>, same beta header <code>context-management-2025-06-27</code>), automatically <b>clears the oldest tool results</b> once input tokens cross a trigger (default 100k), keeping the few most recent.</p>
+    <div class="callout key"><span class="ic">♻️</span><div class="body"><span class="t">The synergy <em>is</em> the mechanism for long-horizon agents</span><p>As the window approaches the limit, Claude is warned and <b>writes the durable facts to memory before the transient tool results are cleared.</b> Forget the noise, keep the signal. Anthropic reports <b>~84% token savings</b> on long-running tasks with the two combined.</p></div></div>
+    <p>Knobs: <code>trigger</code> (when to clear), <code>keep</code> (recent tool pairs to retain, default 3), <code>clear_at_least</code> (for cache efficiency), <code>exclude_tools</code>. Clearing invalidates the prompt cache — <code>clear_at_least</code> blunts that.</p>
+  </section>
+
+  <!-- 04 -->
+  <section id="managed">
+    <h2 class="sec"><span class="num">04</span>Memory in a Managed Agent</h2>
+    <p>A <b>Managed Agent</b> is Anthropic's hosted agent runtime: Anthropic runs the loop, the sandbox, and tool execution; sessions are long-running and stateful. Here memory is <b>not a client tool call</b> — it's a <b>first-class, server-side resource.</b></p>
+    <figure>
+      <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Memory in a Managed Agent">
+        <rect x="22" y="98" width="120" height="56" rx="12" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="82" y="122" text-anchor="middle" font-family="Inter" font-size="13" font-weight="800" fill="#4338ca">You</text>
+        <text x="82" y="140" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5b6478">create &amp; attach store</text>
+        <rect x="190" y="40" width="510" height="172" rx="14" fill="#faf9ff" stroke="#ddd6fe" stroke-width="2"/>
+        <text x="210" y="64" font-family="Inter" font-size="12" font-weight="800" fill="#6d28d9" letter-spacing="0.03em">ANTHROPIC-MANAGED</text>
+        <rect x="214" y="78" width="220" height="58" rx="11" fill="#ede9fe" stroke="#cbb9fb"/>
+        <text x="324" y="102" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#6d28d9">Agent loop + sandbox</text>
+        <text x="324" y="120" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b6478">reads/writes /mnt/memory</text>
+        <rect x="214" y="148" width="220" height="46" rx="11" fill="#eef0ff" stroke="#c7c2ff"/>
+        <text x="324" y="169" text-anchor="middle" font-family="Inter" font-size="11" fill="#4338ca">session state · persisted</text>
+        <text x="324" y="184" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b6478">pause / resume across sessions</text>
+        <rect x="470" y="92" width="210" height="104" rx="12" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+        <text x="575" y="116" text-anchor="middle" font-family="Inter" font-size="13" font-weight="800" fill="#047857">Memory store</text>
+        <text x="575" y="136" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3b6b57">server-side · synced</text>
+        <text x="575" y="153" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3b6b57">versioned (memver_…)</text>
+        <text x="575" y="170" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3b6b57">30-day history · audit</text>
+        <text x="575" y="187" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3b6b57">read-write or read-only</text>
+        <defs><marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b8"/></marker></defs>
+        <path d="M142,126 L188,126" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+        <path d="M434,120 L468,128" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+        <path d="M468,150 L436,142" stroke="#9aa3b8" stroke-width="2" marker-end="url(#b)"/>
+      </svg>
+      <figcaption>You <code>POST /memory_stores/create</code>, attach it to a session (read-write or read-only); it mounts at <code>/mnt/memory</code> and the agent uses ordinary file ops. Anthropic persists &amp; syncs it, with immutable versions and an audit trail. Limits: ~100 kB/file, 2,000 memories/store.</figcaption>
+    </figure>
+    <p>So "how memory works in a Managed Agent" = <b>Anthropic stores it for you, versioned and audited, mounted as a filesystem the agent just reads and writes.</b> No handler to implement — but the data lives on Anthropic's side.</p>
+  </section>
+
+  <!-- 05 -->
+  <section id="choose">
+    <h2 class="sec"><span class="num">05</span>DIY vs Managed — which to pick</h2>
+    <table class="t">
+      <thead><tr><th>Factor</th><th>Client-side tool</th><th>Managed Agent</th></tr></thead>
+      <tbody>
+        <tr><td>Infra effort</td><td class="no">Higher — you implement &amp; store</td><td class="yes">Lower — Anthropic hosts it</td></tr>
+        <tr><td>Data residency &amp; control</td><td class="yes">Full — it's in your infra</td><td class="no">Anthropic holds it</td></tr>
+        <tr><td>ZDR eligible?</td><td class="yes">Yes (if your org has ZDR)</td><td class="no">No — stateful by design</td></tr>
+        <tr><td>HIPAA BAA?</td><td>Eligible w/ ZDR + BAA</td><td class="no">Not currently covered</td></tr>
+        <tr><td>Versioning / audit</td><td>Build your own</td><td class="yes">Built in (30-day, audit trail)</td></tr>
+        <tr><td>Best for</td><td>Regulated, residency, full control</td><td>Speed, long async jobs, less infra</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 06 -->
+  <section id="confuse">
+    <h2 class="sec"><span class="num">06</span>The four "memories," disambiguated</h2>
+    <p>"Claude memory" names four unrelated systems. Don't mix them up:</p>
+    <table class="t">
+      <thead><tr><th>System</th><th>Lives</th><th>Persisted by</th></tr></thead>
+      <tbody>
+        <tr><td>API memory tool</td><td><code>/memories</code> in your infra</td><td><b>You</b> (client-side)</td></tr>
+        <tr><td>Managed Agent memory</td><td><code>/mnt/memory</code> (Anthropic)</td><td><b>Anthropic</b> (server-side, versioned)</td></tr>
+        <tr><td>Agent SDK / Claude Code</td><td><code>~/.claude</code> — CLAUDE.md + auto <code>MEMORY.md</code></td><td>Local machine (own system, not the tool)</td></tr>
+        <tr><td>Claude.ai memory</td><td>Anthropic (consumer app)</td><td>Anthropic — separate feature entirely</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.95rem;color:var(--muted)">Aside: the auto <code>MEMORY.md</code> in row three is what an agentic coding session uses to remember a project across sessions — a different mechanism from the <span class="mono">memory_20250818</span> API tool.</p>
+  </section>
+
+  <!-- 07 -->
+  <section id="risk">
+    <h2 class="sec"><span class="num">07</span>Limits &amp; the real risk: memory poisoning</h2>
+    <p>Persistence has a sharp edge: it turns a <b>one-shot prompt injection into a durable compromise.</b> If the agent processes untrusted input (a user message, a fetched page, a tool result) and gets injected, it can <b>write attacker-controlled content into memory</b> — which every future session then reads as trusted context.</p>
+    <div class="callout danger"><span class="ic">☣️</span><div class="body"><span class="t">Treat memory reads as untrusted</span><p>Mitigate: keep untrusted/reference material <b>read-only</b>; allow <b>read-write only to agent-authored memory</b>; isolate stores <b>per tenant/session</b>; sanitize before writing; validate paths (traversal); and review/audit what persists. Memory you can't trust is worse than no memory.</p></div></div>
+    <ul class="tight">
+      <li><b>Beta, no GA</b> (June 2026) — APIs and limits can shift.</li>
+      <li><b>Size</b> — Managed: ~100 kB/file, 2,000/store; client-side: enforce your own caps &amp; pruning.</li>
+      <li><b>Compliance</b> — Managed Agents aren't ZDR/HIPAA-eligible yet; the client-side tool keeps data in your boundary.</li>
+      <li><b>Cost</b> — memory tool: no separate charge; Managed Agents: ~$0.08/session-hour + model tokens.</li>
+    </ul>
+  </section>
+
+  <!-- 08 -->
+  <section id="regulated">
+    <h2 class="sec"><span class="num">08</span>For a regulated SaaS</h2>
+    <p>The pattern that fits a compliance-heavy B2B product:</p>
+    <ul class="tight">
+      <li><b>Prefer the client-side tool</b> — memory stays in your infrastructure (residency, encryption, retention, ZDR), not Anthropic's.</li>
+      <li><b>Per-tenant isolated stores</b> — one customer's memory can never leak into another's context.</li>
+      <li><b>Audit every mutation</b> — log each memory write as a record (the same <a href="sealing-artifacts.html">WORM + audit</a> spine your filings use).</li>
+      <li><b>Read-only by default</b> for anything derived from untrusted input; human review of what an agent is allowed to persist about a client.</li>
+    </ul>
+    <div class="callout note"><span class="ic">🧭</span><div class="body"><span class="t">The framing</span><p>Memory + context editing give you a <b>durable agent</b>; your <a href="software-3-finance.html">compliance spine</a> governs <em>what it's allowed to remember</em>. The capability is Anthropic's; the trust boundary is yours.</p></div></div>
+  </section>
+
+  <div class="takeaways">
+    <h2>The short version</h2>
+    <ul>
+      <li><span class="tx">Claude has no innate memory — it's an <b>external file store</b> the agent reads at task start, writes as it learns.</span></li>
+      <li><span class="tx"><b>Client-side tool</b> (<span style="font-family:monospace">memory_20250818</span>): Claude emits commands on <code style="background:rgba(255,255,255,.15);color:#fff;border:none">/memories</code>; <b>you</b> execute &amp; store them. Anthropic never sees the files.</span></li>
+      <li><span class="tx"><b>Managed Agent</b>: Anthropic hosts the loop and the memory — server-side store at <code style="background:rgba(255,255,255,.15);color:#fff;border:none">/mnt/memory</code>, <b>versioned &amp; audited</b>, synced across sessions.</span></li>
+      <li><span class="tx"><b>Context editing</b> clears stale tool results; memory keeps the durable facts — together, ~84% fewer tokens on long tasks.</span></li>
+      <li><span class="tx">Persistence makes injection <b>durable</b> — isolate per-tenant, keep untrusted input read-only, audit writes.</span></li>
+      <li><span class="tx">Regulated? <b>Client-side</b> (your boundary, ZDR-eligible) usually beats Managed (not ZDR/HIPAA yet).</span></li>
+    </ul>
+  </div>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><b>Official docs:</b> <a href="https://docs.claude.com/en/docs/agents-and-tools/tool-use/memory-tool">Memory tool</a> · <a href="https://platform.claude.com/docs/en/build-with-claude/context-editing">Context editing</a> · <a href="https://platform.claude.com/docs/en/managed-agents/memory">Using agent memory (Managed Agents)</a> · <a href="https://platform.claude.com/docs/en/managed-agents/overview">Managed Agents overview</a></li>
+      <li><b>Practical guides:</b> <a href="https://claudeapi.com/en/blog/dev-guides/claude-memory-tool-guide/">Claude memory tool in practice</a> · <a href="https://s3p-studios.com/blog/anthropic-memory-tool-context-engineering-agents/">How the memory tool reframes agent building</a></li>
+      <li><b>Memory in Managed Agents (2026):</b> <a href="https://www.edtechinnovationhub.com/news/anthropic-brings-persistent-memory-to-claude-managed-agents-in-public-beta">persistent memory in public beta</a></li>
+      <li><b>Security:</b> <a href="https://arxiv.org/pdf/2506.17318">Corrupted-memory attacks on agents (arXiv)</a> · <a href="https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html">OWASP — prompt injection prevention</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  All the content on this page is AI generated.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button'); btn.style.cssText='position:absolute;top:30px;right:10px;background:rgba(255,255,255,.08);color:#cdd3e6;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;opacity:0;transition:opacity .15s';
+    btn.textContent='Copy';
+    block.addEventListener('mouseenter',function(){btn.style.opacity='1';});
+    block.addEventListener('mouseleave',function(){btn.style.opacity='0';});
+    btn.addEventListener('click',function(){navigator.clipboard.writeText(block.querySelector('code').innerText).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy';},1500);});});
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>
