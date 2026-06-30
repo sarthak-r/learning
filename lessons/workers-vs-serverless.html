@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Workers, Queues &amp; Serverless — Learning</title>
+<meta name="description" content="How background workers actually work, how a task gets assigned, and when to use a worker vs a serverless function like Lambda — the request/background boundary, the reliability machinery, the cost crossover, and the convergence. Concise and current." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f7fb; --surface: #ffffff; --text: #1f2433; --muted: #5b6478; --faint: #8a93a6;
+    --border: #e7e9f0; --primary: #5b51e8; --primary-dark: #4338ca; --primary-soft: #eef0ff;
+    --blue: #2f7df6; --amber: #f59e0b; --green: #10b981; --violet: #8b5cf6; --danger: #ef4444;
+    --danger-soft: #fef2f2; --tip-soft: #ecfdf5; --note-soft: #eff6ff; --warn-soft: #fffbeb;
+    --code-bg: #0f1629; --code-text: #e6e9f2;
+    --radius: 16px; --shadow: 0 1px 2px rgba(20,24,40,.04), 0 8px 24px rgba(20,24,40,.06);
+    --shadow-lg: 0 24px 60px rgba(40,44,80,.14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #efeaff 0%, rgba(239,234,255,0) 55%),
+      radial-gradient(1000px 500px at -10% 0%, #e6f0ff 0%, rgba(230,240,255,0) 50%), var(--bg);
+    color: var(--text); font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.62; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: linear-gradient(90deg, var(--primary), var(--violet)); z-index: 100; transition: width .1s linear; }
+  .topbar { position: sticky; top: 0; z-index: 60; backdrop-filter: saturate(180%) blur(10px); background: rgba(247,247,251,.82); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1080px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .home-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; transition: all .15s ease; }
+  .home-link:hover { color: var(--primary); background: var(--primary-soft); }
+  .topbar .crumb { font-size: 13px; color: var(--faint); font-weight: 500; }
+  .topbar .crumb b { color: var(--text); font-weight: 700; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main { max-width: 800px; margin: 0 auto; padding: 8px 24px 96px; }
+  section { scroll-margin-top: 84px; }
+
+  .hero { text-align: center; padding: 60px 24px 18px; max-width: 870px; margin: 0 auto; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary-soft); color: var(--primary-dark); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px; border: 1px solid #ddd9ff; }
+  .hero h1 { font-size: clamp(2rem, 4.6vw, 3.05rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; margin: 0 0 16px; background: linear-gradient(120deg, #1f2433 28%, #5b51e8 72%, #8b5cf6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p.lede { font-size: 1.16rem; color: var(--muted); margin: 0 auto; max-width: 680px; }
+  .meta-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 24px; color: var(--faint); font-size: 13.5px; font-weight: 500; }
+  .meta-row span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 26px; margin: 30px auto 8px; max-width: 800px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 14px; }
+  .toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+  .toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 14.5px; display: flex; gap: 11px; align-items: baseline; }
+  .toc a::before { content: counter(toc, decimal-leading-zero); color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .toc a:hover { color: var(--primary); }
+  @media (max-width: 620px) { .toc ol { columns: 1; } }
+
+  h2.sec { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; margin: 52px 0 6px; line-height: 1.24; scroll-margin-top: 84px; }
+  h2.sec .num { color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: .9rem; font-weight: 600; margin-right: 10px; }
+  h3 { font-size: 1.08rem; font-weight: 700; margin: 22px 0 4px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: #2b3142; }
+  main p { font-size: 1.04rem; }
+  strong { color: var(--text); font-weight: 700; }
+  .lead-in { font-size: 1.1rem; color: var(--muted); border-left: 3px solid var(--primary); padding-left: 16px; margin: 16px 0 22px; }
+  code { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: .85em; background: #eef0f6; color: #3b3f72; padding: 2px 7px; border-radius: 6px; border: 1px solid #e3e6f0; font-weight: 500; }
+  ul.tight { margin: 12px 0; padding-left: 0; list-style: none; }
+  ul.tight li { position: relative; padding-left: 26px; margin: 9px 0; font-size: 1.0rem; color: #2b3142; }
+  ul.tight li::before { content: "▸"; position: absolute; left: 6px; color: var(--primary); font-size: .9em; top: 1px; }
+  ul.tight li b { color: var(--text); }
+
+  .code-block { position: relative; margin: 16px 0; }
+  .code-block .cap { font-size: 12px; font-weight: 600; color: var(--faint); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+  .code-block pre { background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 12.5px; line-height: 1.62; margin: 0; box-shadow: var(--shadow); }
+  .code-block pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+  .code-block .c { color: #7e89a8; } .code-block .kw { color: #c4b5fd; } .code-block .fn { color: #7ee0b8; } .code-block .s { color: #9fd0a0; } .code-block .n { color: #f6c177; }
+
+  .callout { display: flex; gap: 14px; padding: 15px 18px; border-radius: 14px; margin: 22px 0; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+  .callout .ic { font-size: 1.25rem; line-height: 1.5; flex-shrink: 0; }
+  .callout .body { font-size: .99rem; } .callout .body p { margin: 0; color: #2b3142; }
+  .callout .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .callout.key { background: linear-gradient(180deg,#f5f3ff, #ffffff); border-color: #ddd6fe; } .callout.key .t { color: var(--primary-dark); }
+  .callout.warn { background: var(--warn-soft); border-color: #fde9b8; } .callout.warn .t { color: #b45309; }
+  .callout.note { background: var(--note-soft); border-color: #d6e4ff; } .callout.note .t { color: #1d4ed8; }
+  .callout a { color: var(--primary-dark); font-weight: 600; }
+
+  figure { margin: 26px 0; padding: 24px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { font-size: .9rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  figcaption b { color: var(--text); }
+
+  table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 22px 0; font-size: 13.5px; box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  table.t th, table.t td { padding: 10px 13px; text-align: left; vertical-align: top; }
+  table.t thead th { background: #f1f1f9; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table.t tbody td { border-bottom: 1px solid var(--border); background: var(--surface); color: #2b3142; }
+  table.t tbody tr:last-child td { border-bottom: none; }
+  table.t td:first-child { font-weight: 600; color: var(--text); }
+  table.t .mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--primary-dark); }
+  table.t .w { color: #047857; font-weight: 600; } table.t .s { color: #1d4ed8; font-weight: 600; }
+
+  .takeaways { background: linear-gradient(160deg, #5b51e8, #7c5cf0); color: #fff; border-radius: var(--radius); padding: 30px 32px; margin: 48px 0 10px; box-shadow: var(--shadow-lg); }
+  .takeaways h2 { color: #fff; margin: 0 0 14px; font-size: 1.4rem; }
+  .takeaways ul { margin: 0; padding: 0; list-style: none; }
+  .takeaways li { display: flex; gap: 13px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.16); font-size: 1.0rem; }
+  .takeaways li:first-of-type { border-top: none; }
+  .takeaways li b { color: #fff; } .takeaways li span.tx { color: #ece9ff; }
+
+  .sources { margin: 36px 0 0; font-size: .9rem; }
+  .sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-bottom: 10px; }
+  .sources ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .sources li { margin: 6px 0; }
+  .sources a { color: var(--primary-dark); text-decoration: none; }
+  .sources a:hover { text-decoration: underline; }
+
+  footer { text-align: center; padding: 46px 24px 60px; color: var(--faint); font-size: 14px; border-top: 1px solid var(--border); margin-top: 40px; }
+  footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+  ::selection { background: #ddd6fe; color: #1f2433; }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="home-link" href="../index.html">← All lessons</a>
+    <div class="crumb">Learning&nbsp; / &nbsp;<b>Workers vs Serverless</b></div>
+  </div>
+</div>
+
+<header class="hero">
+  <span class="pill">⚙️ Systems · Async</span>
+  <h1>Workers, Queues &amp; Serverless</h1>
+  <p class="lede">How a task gets handed to a worker, why long jobs belong off the request path, and when a worker beats a serverless function like Lambda. One idea organizes all of it: the <b>queue is the boundary</b> between the request path and the background path.</p>
+  <div class="meta-row">
+    <span>⏱️ ~14 min</span>
+    <span>🏗️ Architecture · decision</span>
+    <span>🔎 Verified, 2026</span>
+  </div>
+</header>
+
+<nav class="toc wrap">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#boundary">The one boundary</a></li>
+    <li><a href="#crash">Why heavy work kills the box</a></li>
+    <li><a href="#queue">How a task actually flows</a></li>
+    <li><a href="#names">"Worker" is five things</a></li>
+    <li><a href="#reliability">The reliability machinery</a></li>
+    <li><a href="#scaling">Concurrency &amp; scaling</a></li>
+    <li><a href="#serverless">Serverless &amp; the 15-min wall</a></li>
+    <li><a href="#decision">When to use which</a></li>
+    <li><a href="#converge">It's converging</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <!-- 01 -->
+  <section id="boundary">
+    <h2 class="sec"><span class="num">01</span>The one boundary</h2>
+    <p class="lead-in">There's a single decision rule: <b>is a human blocked, right now, on this finishing?</b> Yes → keep it on the <b>request path</b>, under the timeout. No → hand it to a worker on the <b>background path</b>. The queue is that boundary — and crossing it has a hidden cost: the request path is effectively exactly-once, but the background path is <b>at-least-once</b> — the same job <em>will</em> eventually run twice.</p>
+    <table class="t">
+      <thead><tr><th></th><th>Request path</th><th>Background path</th></tr></thead>
+      <tbody>
+        <tr><td>Who's waiting</td><td>A human, synchronously</td><td>No one — async</td></tr>
+        <tr><td>Time budget</td><td>Sub-second → hard ~30s timeout</td><td>Minutes to hours</td></tr>
+        <tr><td>Delivery semantics</td><td>Effectively exactly-once</td><td><b>At-least-once</b> (plan for retries)</td></tr>
+        <tr><td>Generating a 40-yr projection?</td><td>No — you'll blow the timeout</td><td>Yes — enqueue it</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 02 -->
+  <section id="crash">
+    <h2 class="sec"><span class="num">02</span>Why heavy work in the request path kills the box</h2>
+    <p>It's <em>not</em> that the server can't do the math — a 40-year Monte Carlo costs the same CPU-seconds anywhere. It's that the request path has <b>hard short deadlines</b> and <b>fixed concurrency</b>:</p>
+    <ul class="tight">
+      <li><b>Deadlines you don't control:</b> API Gateway ~29s, ALB 60s, Heroku router 30s, Gunicorn worker 30s. The projection outlives them and gets killed mid-flight.</li>
+      <li><b>Fixed worker pool:</b> a handful of slow projection requests occupy every web worker, so fast requests (a login, a page load) queue behind them — <b>head-of-line blocking</b>. A spike then becomes a retry storm and the box falls over. The crash isn't compute; it's <b>starvation</b>.</li>
+    </ul>
+    <p>Offloading to a queue fixes this by <b>decoupling arrival rate from service rate</b> — the burst inflates queue depth instead of concurrent pressure.</p>
+  </section>
+
+  <!-- 03 -->
+  <section id="queue">
+    <h2 class="sec"><span class="num">03</span>How a task actually flows (nobody "assigns" it)</h2>
+    <p>The mental model "assign a task to a worker" is subtly wrong: <b>producers don't pick workers — workers pull tasks.</b> Many workers compete on one queue; the broker hands each message to exactly one. The queue is the load-balancer.</p>
+    <figure>
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Queue and worker architecture">
+        <defs>
+          <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b8"/></marker>
+          <marker id="r" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ef4444"/></marker>
+        </defs>
+        <!-- request path -->
+        <rect x="12" y="86" width="60" height="44" rx="9" fill="#eff6ff" stroke="#bcd6fb" stroke-width="1.5"/>
+        <text x="42" y="112" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#1d4ed8">client</text>
+        <rect x="104" y="80" width="128" height="56" rx="11" fill="#eef0ff" stroke="#c7c2ff" stroke-width="1.5"/>
+        <text x="168" y="102" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="800" fill="#4338ca">Web / API</text>
+        <text x="168" y="120" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5b6478">validate · enqueue · ~30ms</text>
+        <path d="M72,100 L102,100" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <path d="M104,120 C70,150 70,150 72,124" fill="none" stroke="#9aa3b8" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#a)"/>
+        <text x="60" y="152" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#8a93a6">202 + job_id</text>
+        <!-- queue -->
+        <path d="M276,78 a42,9 0 0,0 84,0 v68 a42,9 0 0,1 -84,0 z" fill="#ecfdf5" stroke="#a8e6c8" stroke-width="1.5"/>
+        <ellipse cx="318" cy="78" rx="42" ry="9" fill="#d6f5e6" stroke="#a8e6c8" stroke-width="1.5"/>
+        <text x="318" y="108" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="800" fill="#047857">Queue</text>
+        <text x="318" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#3b6b57">depth = shock</text>
+        <text x="318" y="137" text-anchor="middle" font-family="Inter" font-size="9" fill="#3b6b57">absorber</text>
+        <path d="M232,104 L274,104" stroke="#9aa3b8" stroke-width="2" marker-end="url(#a)"/>
+        <text x="253" y="96" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5b6478">enqueue plan_id</text>
+        <!-- workers -->
+        <g font-family="Inter">
+          <rect x="452" y="40" width="116" height="34" rx="8" fill="#f5f3ff" stroke="#ddd6fe"/><text x="510" y="62" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6d28d9">Worker 1</text>
+          <rect x="452" y="86" width="116" height="34" rx="8" fill="#f5f3ff" stroke="#ddd6fe"/><text x="510" y="108" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6d28d9">Worker 2</text>
+          <rect x="452" y="132" width="116" height="34" rx="8" fill="#f5f3ff" stroke="#ddd6fe"/><text x="510" y="154" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6d28d9">Worker N</text>
+        </g>
+        <path d="M360,96 L450,60" stroke="#9aa3b8" stroke-width="1.8" marker-end="url(#a)"/>
+        <path d="M360,104 L450,103" stroke="#9aa3b8" stroke-width="1.8" marker-end="url(#a)"/>
+        <path d="M360,114 L450,146" stroke="#9aa3b8" stroke-width="1.8" marker-end="url(#a)"/>
+        <text x="408" y="34" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b6478">competing consumers · pull one</text>
+        <!-- result store -->
+        <ellipse cx="650" cy="80" rx="40" ry="8" fill="#dbeafe" stroke="#bcd6fb" stroke-width="1.5"/>
+        <path d="M610,80 v52 a40,8 0 0,0 80,0 v-52" fill="#eff6ff" stroke="#bcd6fb" stroke-width="1.5"/>
+        <text x="650" y="106" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1d4ed8">result</text>
+        <text x="650" y="120" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1d4ed8">store</text>
+        <path d="M568,57 L612,72" stroke="#9aa3b8" stroke-width="1.6" marker-end="url(#a)"/>
+        <path d="M568,149 L612,120" stroke="#9aa3b8" stroke-width="1.6" marker-end="url(#a)"/>
+        <text x="592" y="150" text-anchor="middle" font-family="Inter" font-size="8" fill="#5b6478">write, then ack</text>
+        <!-- redeliver back-edge -->
+        <path d="M452,160 C400,200 360,180 330,150" fill="none" stroke="#ef4444" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#r)"/>
+        <text x="392" y="200" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#b91c1c">crash / no ack → visibility timeout → redeliver</text>
+        <!-- DLQ -->
+        <rect x="276" y="222" width="84" height="38" rx="9" fill="#fef2f2" stroke="#fbd2d2" stroke-width="1.5"/>
+        <text x="318" y="240" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#b91c1c">DLQ</text>
+        <text x="318" y="253" text-anchor="middle" font-family="Inter" font-size="8" fill="#b91c1c">poison msgs</text>
+        <path d="M318,148 L318,220" stroke="#ef4444" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#r)"/>
+        <text x="360" y="190" text-anchor="middle" font-family="Inter" font-size="8" fill="#b91c1c">after N fails</text>
+        <!-- autoscale -->
+        <rect x="430" y="222" width="262" height="44" rx="10" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="1.4" stroke-dasharray="5 3"/>
+        <text x="561" y="241" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#6d28d9">KEDA: replicas = ⌈depth / target⌉</text>
+        <text x="561" y="256" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5b6478">scale on queue DEPTH, not CPU</text>
+        <path d="M520,222 L510,168" stroke="#a78bfa" stroke-width="1.6" marker-end="url(#a)"/>
+        <!-- legend -->
+        <rect x="14" y="318" width="12" height="12" rx="3" fill="#eef0ff" stroke="#c7c2ff"/><text x="32" y="328" font-family="Inter" font-size="10" fill="#5b6478">request path</text>
+        <rect x="140" y="318" width="12" height="12" rx="3" fill="#ecfdf5" stroke="#a8e6c8"/><text x="158" y="328" font-family="Inter" font-size="10" fill="#5b6478">background path</text>
+        <line x1="276" y1="324" x2="296" y2="324" stroke="#ef4444" stroke-width="1.6" stroke-dasharray="4 3"/><text x="302" y="328" font-family="Inter" font-size="10" fill="#5b6478">failure / redeliver</text>
+      </svg>
+      <figcaption>The request returns a <code>202 + job_id</code> in ~30ms; the client later polls <code>/jobs/{id}</code>, gets a webhook, or streams progress over SSE. The worker writes the result <em>then</em> acks — so a crash mid-job just redelivers.</figcaption>
+    </figure>
+    <div class="code-block">
+      <p class="cap">the boundary, in code</p>
+      <pre><code><span class="c"># request path — does almost nothing, returns in ~30ms</span>
+<span class="kw">@app.post</span>(<span class="s">"/plans/{id}/generate"</span>)
+<span class="kw">def</span> <span class="fn">generate</span>(id):
+    <span class="fn">enqueue</span>(<span class="s">"generate_plan"</span>, plan_id=id)   <span class="c"># pass the ID, NOT the data</span>
+    <span class="kw">return</span> <span class="n">202</span>, { <span class="s">"job_id"</span>: id, <span class="s">"status_url"</span>: <span class="s">f"/jobs/{id}"</span> }
+
+<span class="c"># background path — minutes later, on a worker, MUST be idempotent</span>
+<span class="kw">@worker.task</span>(acks_late=<span class="kw">True</span>)
+<span class="kw">def</span> <span class="fn">generate_plan</span>(plan_id):
+    <span class="kw">if</span> <span class="fn">already_done</span>(plan_id): <span class="kw">return</span>     <span class="c"># at-least-once → may run twice</span>
+    <span class="fn">save</span>(plan_id, <span class="fn">run_projection</span>(plan_id))  <span class="c"># the 40-year Monte Carlo</span></code></pre>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section id="names">
+    <h2 class="sec"><span class="num">04</span>"Worker" is five different things</h2>
+    <p>The word collapses five unrelated concepts. Pin <em>what spawns it</em> and <em>whether a user is blocked</em> and the ambiguity dissolves:</p>
+    <table class="t">
+      <thead><tr><th>"Worker"</th><th>Actually is</th><th>Time budget</th><th>Request path?</th></tr></thead>
+      <tbody>
+        <tr><td><b>Background job worker</b> <span style="color:var(--faint)">(the subject)</span></td><td>Long-lived process pulling jobs off a queue</td><td>Minutes → hours</td><td class="w">No</td></tr>
+        <tr><td>Web-server worker</td><td>Process serving one HTTP request (Gunicorn/Puma)</td><td>Seconds (~30s cap)</td><td class="s">Yes</td></tr>
+        <tr><td>Web Worker</td><td>Browser background thread (no DOM)</td><td>Tab lifetime</td><td>In-browser</td></tr>
+        <tr><td>Node <code>worker_threads</code></td><td>OS thread inside one Node process</td><td>Process lifetime</td><td>In-process</td></tr>
+        <tr><td>Cloudflare Workers</td><td><b>Edge serverless</b> (V8 isolate) — not a bg worker</td><td>CPU 30s, max 5 min</td><td class="s">Yes</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.95rem;color:var(--muted)">Only the first intentionally does slow work decoupled from a user. "Cloudflare Workers" reused the <em>Service Worker</em> API name — it's a request handler at the edge, not a background queue consumer.</p>
+  </section>
+
+  <!-- 05 -->
+  <section id="reliability">
+    <h2 class="sec"><span class="num">05</span>The reliability machinery (the real price of the background path)</h2>
+    <p>You traded a blocked human for a delivery guarantee that's weaker than it looks. <b>At-least-once is universal; exactly-once delivery is a myth</b> — the ack itself can be lost, so the broker must redeliver. You don't get exactly-once; you <em>engineer</em> effectively-once:</p>
+    <ul class="tight">
+      <li><b>Idempotency is mandatory.</b> Every handler runs twice eventually — dedupe on a key (<code>plan_id + hash(inputs)</code>) or make the write naturally overwrite-by-key.</li>
+      <li><b>Visibility timeout &gt; p99, or heartbeat.</b> The gotcha: <code>acks_late</code> does <em>not</em> extend the redelivery clock — a 45-min job under a shorter window gets a <b>second worker started mid-flight</b>.</li>
+      <li><b>Retries with backoff + jitter</b>; a <b>DLQ</b> for poison messages (after N receives); <b>graceful drain</b> on deploy so in-flight jobs finish.</li>
+      <li><b>Pass IDs, not payloads.</b> A fat message is a stale snapshot by the time it runs, bloats the broker, and busts size caps (SQS 256 KB). Big blob → claim-check (put it in S3, enqueue the key).</li>
+      <li><b>Mind the dual-write race.</b> Commit-then-enqueue can lose a job; enqueue-then-rollback creates a phantom. Fix with a transactional outbox.</li>
+    </ul>
+  </section>
+
+  <!-- 06 -->
+  <section id="scaling">
+    <h2 class="sec"><span class="num">06</span>Concurrency &amp; scaling</h2>
+    <ul class="tight">
+      <li><b>Match the model to the work:</b> prefork <b>processes</b> for CPU-bound projection math (the Python GIL means threads won't parallelize it); <b>async</b>/event-loop for I/O fan-out (calling many APIs).</li>
+      <li><b>Autoscale on queue depth, not CPU.</b> A worker mid-projection pins a core whether the backlog is 0 or 10,000 — CPU is the wrong signal. Scale replicas on depth/lag (KEDA), targeting 60–80% utilization. Use a job-style scaler so scale-down can't evict a running 30-min job.</li>
+      <li><b>The DB is the real ceiling.</b> Connections = replicas × concurrency × pool size; autoscaling workers can take down Postgres faster than they help. Cap with a pooler (PgBouncer) + a max-replica guard.</li>
+    </ul>
+  </section>
+
+  <!-- 07 -->
+  <section id="serverless">
+    <h2 class="sec"><span class="num">07</span>Serverless &amp; the 15-minute wall</h2>
+    <p>A serverless function (AWS Lambda) is the other way to run the background path: <b>event-driven, per-invocation isolated, scale-to-zero</b> compute. You don't run a pool — each event gets its own ephemeral micro-VM. The trade-offs are sharp and mostly fixed:</p>
+    <ul class="tight">
+      <li><b>Hard 900-second (15-min) timeout</b>, 128 MB–10 GB RAM, stateless. A multi-decade projection simply won't fit in one invocation.</li>
+      <li><b>Idle = $0</b>, billed per millisecond — but at a premium, with <b>no commit discounts</b> (Fargate/EC2 get Savings Plans ~50% and Spot ~70%).</li>
+      <li><b>Cold starts</b> are real but a red herring for async batch jobs (no user waiting). SnapStart/Provisioned Concurrency mitigate when latency matters.</li>
+    </ul>
+    <div class="callout note"><span class="ic">🧱</span><div class="body"><span class="t">2026: the wall is getting escape hatches</span><p>Lambda <b>Durable Functions</b> checkpoint/replay a single execution for up to a year; <b>Managed Instances</b> run Lambda on your EC2 for steady workloads; Cloud Run lifted request timeouts to 60 min. The 900s <em>per-invocation</em> wall hasn't moved — but you can now step around it.</p></div></div>
+  </section>
+
+  <!-- 08 -->
+  <section id="decision">
+    <h2 class="sec"><span class="num">08</span>When to use which</h2>
+    <p>Two axes decide it: <b>job duration</b> and <b>traffic shape</b> (with cost falling out of utilization).</p>
+    <figure>
+      <svg viewBox="0 0 660 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision quadrant: duration vs traffic shape">
+        <!-- cells -->
+        <rect x="112" y="54" width="244" height="166" fill="#f5f3ff"/>
+        <rect x="356" y="54" width="244" height="166" fill="#ecfdf5"/>
+        <rect x="112" y="220" width="244" height="166" fill="#eff6ff"/>
+        <rect x="356" y="220" width="244" height="166" fill="#fff7ed"/>
+        <!-- 15-min wall -->
+        <line x1="112" y1="220" x2="600" y2="220" stroke="#ef4444" stroke-width="2" stroke-dasharray="7 5"/>
+        <text x="598" y="214" text-anchor="end" font-family="Inter" font-size="10.5" font-weight="700" fill="#b91c1c">▲ the Lambda wall — 900s (15 min)</text>
+        <!-- grid divider -->
+        <line x1="356" y1="54" x2="356" y2="386" stroke="#d8dae6" stroke-width="1.5"/>
+        <!-- axes -->
+        <line x1="112" y1="386" x2="600" y2="386" stroke="#1f2433" stroke-width="2"/>
+        <line x1="112" y1="54" x2="112" y2="386" stroke="#1f2433" stroke-width="2"/>
+        <g font-family="Inter">
+          <text x="356" y="416" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2433">Traffic shape →</text>
+          <text x="150" y="404" text-anchor="middle" font-size="9.5" fill="#5b6478">spiky / bursty</text>
+          <text x="556" y="404" text-anchor="middle" font-size="9.5" fill="#5b6478">steady / high</text>
+          <text x="104" y="220" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2433" transform="rotate(-90 104 220)">Duration →</text>
+          <text x="92" y="360" text-anchor="end" font-size="9.5" fill="#5b6478">short</text>
+          <text x="92" y="70" text-anchor="end" font-size="9.5" fill="#5b6478">long</text>
+        </g>
+        <!-- cell labels -->
+        <g font-family="Inter" text-anchor="middle">
+          <text x="234" y="120" font-size="12" font-weight="800" fill="#6d28d9">Durable execution</text>
+          <text x="234" y="138" font-size="9.5" fill="#5b6478">Step Functions / Temporal</text>
+          <text x="234" y="151" font-size="9.5" fill="#5b6478">orchestrate Lambda steps</text>
+
+          <text x="478" y="116" font-size="12" font-weight="800" fill="#047857">Container worker fleet</text>
+          <text x="478" y="134" font-size="9.5" fill="#3b6b57">Fargate / EKS — RAM &amp; CPU</text>
+          <text x="478" y="147" font-size="9.5" fill="#3b6b57">Lambda can't give; runs 24/7</text>
+          <text x="478" y="176" font-size="10" font-weight="700" fill="#b45309">★ multi-decade projection</text>
+
+          <text x="234" y="290" font-size="12" font-weight="800" fill="#1d4ed8">Serverless function</text>
+          <text x="234" y="308" font-size="9.5" fill="#5b6478">Lambda (or SQS + Lambda)</text>
+          <text x="234" y="321" font-size="9.5" fill="#5b6478">idle = $0, instant scale</text>
+
+          <text x="478" y="290" font-size="12" font-weight="800" fill="#b45309">Worker on a Savings Plan</text>
+          <text x="478" y="308" font-size="9.5" fill="#8a5a1f">Fargate — high utilization</text>
+          <text x="478" y="321" font-size="9.5" fill="#8a5a1f">undercuts Lambda 2–10×</text>
+        </g>
+      </svg>
+      <figcaption>The cost crossover is a <b>duty-cycle</b> question, not a request-count one: serverless wins when compute is idle/bursty; an always-on worker wins at sustained &gt;60–70% utilization. Heavy jobs (1 GB, ~2s) cross near <b>~1M/month</b>.</figcaption>
+    </figure>
+    <table class="t">
+      <thead><tr><th>Dimension</th><th>Background worker (Fargate/ECS/K8s)</th><th>Serverless (Lambda)</th></tr></thead>
+      <tbody>
+        <tr><td>Max duration</td><td class="w">Unbounded</td><td class="s">900s hard cap</td></tr>
+        <tr><td>Billing</td><td>Per wall-clock second (busy or idle)</td><td>Per-ms; <b>idle = $0</b></td></tr>
+        <tr><td>Commit discounts</td><td class="w">Savings Plans / Spot (~50–70%)</td><td class="s">None — list price</td></tr>
+        <tr><td>Scaling</td><td>You tune a pool (KEDA on depth)</td><td class="s">Instant to thousands; no pool</td></tr>
+        <tr><td>State</td><td class="w">Warm caches, in-memory OK</td><td>Stateless; externalize it</td></tr>
+        <tr><td>Best fit</td><td>Steady, high, long, heavy</td><td>Spiky, bursty, short, low-baseline</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 09 -->
+  <section id="converge">
+    <h2 class="sec"><span class="num">09</span>It's converging — stop thinking binary</h2>
+    <p>The two ends are growing into each other: serverless gained duration and state (Durable Functions, Managed Instances, Cloud Run 60-min); workers gained serverless ergonomics (KEDA scale-to-zero, Fargate, managed Temporal). <b>"Function vs worker" is now mostly a billing-model + duration choice over the same container runtime</b> — both billing models live on both sides of the boundary.</p>
+    <div class="callout key"><span class="ic">🧩</span><div class="body"><span class="t">The shape for a plan-generation pipeline</span><p>For a multi-step, must-finish job, reach for <b>durable execution</b> (Temporal / Step Functions / Lambda Durable Functions): an orchestrator decomposes the work, Lambda runs the light steps, and a <b>Fargate task runs the heavy projection</b>. One caveat — durable execution <em>moves</em> the idempotency burden to each step boundary; it doesn't lift it. Your activities still need dedupe keys.</p></div></div>
+  </section>
+
+  <div class="takeaways">
+    <h2>The short version</h2>
+    <ul>
+      <li><span class="tx"><b>The queue is the boundary:</b> request path (fast, human waiting, exactly-once) vs background path (slow, retried, <b>at-least-once</b>).</span></li>
+      <li><span class="tx">Heavy work crashes the request path through <b>starvation</b> (timeouts + fixed pool), not raw compute.</span></li>
+      <li><span class="tx">Workers don't get assigned work — they <b>pull</b> it (competing consumers); the queue load-levels bursts.</span></li>
+      <li><span class="tx">At-least-once is universal → <b>idempotency is mandatory</b>; pass <b>IDs not payloads</b>; autoscale on <b>queue depth</b>, not CPU.</span></li>
+      <li><span class="tx"><b>Serverless</b> = idle-$0, instant scale, 15-min wall. <b>Workers</b> = sustained-util cheap, unbounded duration.</span></li>
+      <li><span class="tx">It's <b>converging</b>: a billing-model + duration choice over the same runtime; durable execution for must-finish pipelines.</span></li>
+    </ul>
+  </div>
+
+  <div class="sources" id="sources">
+    <h3>Sources &amp; go deeper</h3>
+    <ul>
+      <li><b>Limits &amp; pricing:</b> <a href="https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html">Lambda quotas</a> · <a href="https://aws.amazon.com/lambda/pricing/">Lambda pricing</a> · <a href="https://aws.amazon.com/fargate/">Fargate</a> · <a href="https://docs.cloud.google.com/run/docs/configuring/request-timeout">Cloud Run 60-min timeout</a></li>
+      <li><b>Queue semantics:</b> <a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html">SQS visibility timeout</a> · <a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html">dead-letter queues</a></li>
+      <li><b>Decision &amp; cost:</b> <a href="https://docs.aws.amazon.com/decision-guides/latest/fargate-or-lambda/fargate-or-lambda.html">AWS — Fargate or Lambda</a> · <a href="https://leanopstech.com/blog/aws-lambda-vs-fargate-cost-breakeven-2026/">Lambda-vs-Fargate breakeven (2026)</a></li>
+      <li><b>Scaling &amp; patterns:</b> <a href="https://keda.sh/">KEDA</a> · <a href="https://www.digitalapplied.com/blog/background-job-queue-patterns-2026-engineering-reference">Background jobs &amp; queues, 2026 reference</a> · <a href="https://www.inngest.com/blog/when-a-queue-isnt-enough">When a queue isn't enough (durable execution)</a></li>
+      <li><b>Converging compute:</b> <a href="https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html">Lambda Durable Functions</a> · <a href="https://www.readysetcloud.io/blog/allen.helton/step-functions-vs-temporal/">Step Functions vs Temporal</a></li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  All the content on this page is AI generated.
+</footer>
+
+<script>
+  var bar = document.getElementById('progress');
+  function onScroll() { var h = document.documentElement; bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + '%'; }
+  document.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  document.querySelectorAll('.code-block').forEach(function (block) {
+    var btn = document.createElement('button'); btn.style.cssText='position:absolute;top:30px;right:10px;background:rgba(255,255,255,.08);color:#cdd3e6;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;opacity:0;transition:opacity .15s';
+    btn.textContent='Copy';
+    block.addEventListener('mouseenter',function(){btn.style.opacity='1';});
+    block.addEventListener('mouseleave',function(){btn.style.opacity='0';});
+    btn.addEventListener('click',function(){navigator.clipboard.writeText(block.querySelector('code').innerText).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy';},1500);});});
+    block.appendChild(btn);
+  });
+</script>
+</body>
+</html>
